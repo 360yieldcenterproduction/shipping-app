@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0064)file:///C:/Users/bsauder/Downloads/360yc-shipping-gen1-v2_4.html -->
+<!-- saved from url=(0064)file:///C:/Users/bsauder/Downloads/360yc-shipping-gen1-v2_5.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
@@ -476,12 +476,10 @@ const CFG = {
 };
 
 // ═══════════════════════════════════════════════════
-//  MSAL
+//  MSAL — initialized in DOMContentLoaded to ensure
+//  msal-browser.min.js is fully parsed before use
 // ═══════════════════════════════════════════════════
-const msalApp = new msal.PublicClientApplication({
-  auth:{ clientId:CFG.clientId, authority:`https://login.microsoftonline.com/${CFG.tenantId}`, redirectUri:CFG.redirectUri },
-  cache:{ cacheLocation:'localStorage', storeAuthStateInCookie:true }
-});
+let msalApp = null;
 const scopes = ['User.Read','Sites.ReadWrite.All','Files.ReadWrite.All'];
 
 // ═══════════════════════════════════════════════════
@@ -542,6 +540,13 @@ function onSignedIn(){
 window.addEventListener('DOMContentLoaded', async()=>{
   // Log what scanning capabilities are available on this device
   console.log('Device scan capabilities — BarcodeDetector:', ('BarcodeDetector' in window), '| ZXing:', typeof ZXing, '| UserAgent:', navigator.userAgent);
+
+  // Initialize MSAL here so msal-browser.min.js is guaranteed loaded
+  msalApp = new msal.PublicClientApplication({
+    auth:{ clientId:CFG.clientId, authority:`https://login.microsoftonline.com/${CFG.tenantId}`, redirectUri:CFG.redirectUri },
+    cache:{ cacheLocation:'localStorage', storeAuthStateInCookie:true }
+  });
+
   try{
     await msalApp.initialize();
 
