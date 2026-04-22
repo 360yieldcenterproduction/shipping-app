@@ -1,0 +1,2289 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+<meta name="theme-color" content="#1A1A1A"/>
+<title>360 Yield Center | Shipping</title>
+<script src="https://alcdn.msauth.net/browser/2.38.2/js/msal-browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/umd/index.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700;800;900&family=JetBrains+Mono:wght@500;600&display=swap');
+
+:root {
+  --red:#CC1F27; --red-dk:#A8181F; --red-lt:#FCECED; --red-mid:#F5D0D1; --red-glow:rgba(204,31,39,0.12);
+  --gray:#6D6E71; --gray-lt:#EBEBEC; --gray-mid:#D1D2D4; --gray-dk:#4A4B4E;
+  --black:#1A1A1A; --off-white:#F4F4F5; --surface:#FFFFFF; --surface2:#F2F2F3; --border:#D8D9DB;
+  --text:#1A1A1A; --text-dim:#5A5B5E; --text-muted:#9A9B9E;
+  --green:#1B6E35; --green-lt:#E6F2EB; --green-mid:rgba(27,110,53,0.2);
+  --amber:#A05C00; --amber-lt:#FEF3DC;
+  --radius:10px; --radius-sm:6px; --radius-lg:16px;
+  --shadow-sm:0 1px 3px rgba(0,0,0,0.07),0 1px 2px rgba(0,0,0,0.05);
+  --shadow:0 3px 12px rgba(0,0,0,0.09);
+  --shadow-lg:0 8px 30px rgba(0,0,0,0.14);
+  --font:'Barlow',sans-serif; --font-cond:'Barlow Condensed',sans-serif; --font-mono:'JetBrains Mono',monospace;
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;width:100%;background:var(--off-white);color:var(--text);font-family:var(--font);-webkit-font-smoothing:antialiased;overflow:hidden;}
+button{font-family:var(--font);cursor:pointer;border:none;outline:none;-webkit-tap-highlight-color:transparent;}
+input,select{font-family:var(--font);outline:none;}
+
+/* ── SHELL ── */
+#app{height:100dvh;display:flex;flex-direction:column;overflow:hidden;}
+.screen{display:none;flex-direction:column;height:100%;overflow:hidden;}
+.screen.active{display:flex;animation:sIn .2s ease both;}
+@keyframes sIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+
+/* ── HEADER ── */
+.app-header{height:56px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:var(--black);border-bottom:3px solid var(--red);gap:10px;}
+.h-left{display:flex;align-items:center;gap:10px;min-width:0;}
+.h-pipe{width:1px;height:20px;background:rgba(255,255,255,0.2);flex-shrink:0;}
+.h-sub{font-family:var(--font-cond);font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:rgba(255,255,255,0.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.h-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.user-chip{display:flex;align-items:center;gap:5px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.13);border-radius:20px;padding:3px 9px 3px 4px;max-width:140px;}
+.user-av{width:20px;height:20px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center;font-family:var(--font-cond);font-size:9px;font-weight:800;color:#fff;flex-shrink:0;}
+.user-name{font-size:11px;font-weight:600;color:rgba(255,255,255,0.8);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.btn-icon{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.13);border-radius:var(--radius-sm);color:rgba(255,255,255,0.6);width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:15px;transition:all .15s;flex-shrink:0;}
+.btn-icon:hover{color:#fff;background:rgba(255,255,255,0.16);}
+.back-btn{display:flex;align-items:center;gap:4px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.13);border-radius:var(--radius-sm);color:rgba(255,255,255,0.7);padding:4px 9px 4px 6px;font-family:var(--font-cond);font-size:12px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;transition:all .15s;}
+.back-btn:hover{color:#fff;background:rgba(255,255,255,0.16);}
+
+/* ── STEP BAR ── */
+.step-bar{height:42px;flex-shrink:0;display:flex;align-items:stretch;background:var(--black);border-bottom:1px solid rgba(255,255,255,0.07);}
+.step{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;position:relative;padding:3px 2px;}
+.step::after{content:"›";position:absolute;right:0;top:50%;transform:translateY(-50%);color:rgba(255,255,255,0.18);font-size:16px;line-height:1;}
+.step:last-child::after{display:none;}
+.step-dot{width:18px;height:18px;border-radius:50%;background:rgba(255,255,255,0.09);display:flex;align-items:center;justify-content:center;font-family:var(--font-cond);font-size:9px;font-weight:800;color:rgba(255,255,255,0.28);transition:all .2s;}
+.step-lbl{font-family:var(--font-cond);font-size:8px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:rgba(255,255,255,0.28);white-space:nowrap;}
+.step.active .step-dot{background:var(--red);color:#fff;box-shadow:0 0 0 3px rgba(204,31,39,0.28);}
+.step.active .step-lbl{color:rgba(255,255,255,0.88);}
+.step.done .step-dot{background:var(--green);color:#fff;font-size:0;}
+.step.done .step-dot::before{content:"✓";font-size:10px;}
+.step.done .step-lbl{color:rgba(255,255,255,0.4);}
+
+/* ── BODY ── */
+.screen-body{flex:1;overflow-y:auto;overflow-x:hidden;padding:14px;display:flex;flex-direction:column;gap:12px;background:var(--off-white);}
+.screen-body::-webkit-scrollbar{width:3px;}
+.screen-body::-webkit-scrollbar-thumb{background:var(--gray-mid);border-radius:2px;}
+
+/* ── CARDS ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow-sm);}
+.card-label{font-family:var(--font-cond);font-size:10px;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted);margin-bottom:9px;}
+
+/* ── FORMS ── */
+.field-group{display:flex;flex-direction:column;gap:5px;}
+.field-label{font-family:var(--font-cond);font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-dim);}
+input[type="text"],select{width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:17px;font-weight:500;padding:11px 13px;transition:border-color .15s,box-shadow .15s;-webkit-appearance:none;appearance:none;}
+input[type="text"]:focus,select:focus{border-color:var(--red);box-shadow:0 0 0 3px var(--red-glow);}
+input[type="text"]::placeholder{color:var(--text-muted);font-weight:400;}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%236D6E71' d='M6 8L0 0h12z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 13px center;padding-right:34px;cursor:pointer;}
+
+/* ── BUTTONS ── */
+.btn{display:flex;align-items:center;justify-content:center;gap:7px;padding:13px 16px;border-radius:var(--radius-sm);font-family:var(--font-cond);font-size:15px;font-weight:800;letter-spacing:0.05em;text-transform:uppercase;transition:all .15s;width:100%;}
+.btn:active{transform:scale(0.97);}
+.btn-primary{background:var(--red);color:#fff;box-shadow:0 3px 10px rgba(204,31,39,0.25);}
+.btn-primary:hover{background:var(--red-dk);}
+.btn-primary:disabled{background:var(--gray);box-shadow:none;cursor:not-allowed;opacity:.6;}
+.btn-outline{background:var(--surface);color:var(--text);border:1.5px solid var(--border);}
+.btn-outline:hover{border-color:var(--red);color:var(--red);}
+.btn-outline:disabled{opacity:.5;cursor:not-allowed;}
+.btn-success{background:var(--green);color:#fff;box-shadow:0 3px 10px rgba(27,110,53,0.22);}
+.btn-success:disabled{background:var(--gray);box-shadow:none;cursor:not-allowed;opacity:.6;}
+.btn-ghost{background:transparent;color:var(--gray);border:1.5px solid var(--gray-mid);}
+.btn-ghost:hover{border-color:var(--gray-dk);color:var(--text);}
+.btn-sm{padding:8px 13px;font-size:12px;width:auto;}
+.btn-row{display:flex;gap:9px;}
+.btn-row .btn{flex:1;}
+
+/* ── SCAN ZONE ── */
+.scan-zone{background:var(--surface);border:2px dashed var(--gray-mid);border-radius:var(--radius);padding:26px 16px;display:flex;flex-direction:column;align-items:center;gap:9px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;}
+.scan-zone:hover,.scan-zone.scanning{border-color:var(--red);background:var(--red-lt);}
+.scan-icon{font-size:34px;line-height:1;}
+.scan-zone h3{font-family:var(--font-cond);font-size:17px;font-weight:800;letter-spacing:0.02em;color:var(--black);}
+.scan-zone p{font-size:12px;color:var(--text-dim);max-width:230px;line-height:1.5;}
+
+/* ── CAMERA ── */
+.camera-wrap{position:relative;width:100%;border-radius:var(--radius);overflow:hidden;background:#000;aspect-ratio:4/3;}
+.camera-wrap video{width:100%;height:100%;object-fit:cover;display:block;}
+.cam-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;}
+.cam-xhair-bar{width:70%;aspect-ratio:3/1;border:2.5px solid rgba(204,31,39,0.85);border-radius:8px;box-shadow:0 0 0 9999px rgba(0,0,0,0.5);}
+.cam-xhair-sq{width:55%;aspect-ratio:1;border:2.5px solid rgba(204,31,39,0.85);border-radius:10px;box-shadow:0 0 0 9999px rgba(0,0,0,0.45);}
+.cam-hint{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.65);color:#fff;font-family:var(--font-cond);font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;padding:5px 14px;border-radius:20px;white-space:nowrap;}
+#capture-canvas{display:none;}
+
+/* ── PHOTO GRID ── */
+.photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:9px;}
+.photo-thumb{position:relative;aspect-ratio:1;border-radius:var(--radius-sm);overflow:hidden;background:var(--surface2);border:1px solid var(--border);}
+.photo-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+.thumb-label{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.62);font-family:var(--font-cond);font-size:9px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:#fff;padding:3px 4px;text-align:center;}
+.thumb-rm{position:absolute;top:3px;right:3px;width:19px;height:19px;background:var(--red);border-radius:50%;border:none;color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;line-height:1;}
+.thumb-rm:disabled{opacity:0;pointer-events:none;}
+
+/* ── COMPLETED BOX GALLERY ── */
+.gallery-scroll{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;}
+.gallery-scroll::-webkit-scrollbar{height:3px;}
+.gallery-scroll::-webkit-scrollbar-thumb{background:var(--gray-mid);border-radius:2px;}
+.gallery-card{flex-shrink:0;width:130px;background:var(--surface);border:1.5px solid var(--green-mid);border-radius:var(--radius);overflow:hidden;cursor:pointer;transition:all .15s;box-shadow:var(--shadow-sm);}
+.gallery-card:hover{border-color:var(--green);box-shadow:var(--shadow);}
+.gallery-card.editing{border-color:var(--red);box-shadow:0 0 0 2px var(--red-glow);}
+.gallery-thumb-strip{display:grid;grid-template-columns:1fr 1fr;height:72px;gap:1px;background:var(--border);}
+.gallery-thumb-strip img{width:100%;height:100%;object-fit:cover;display:block;}
+.gallery-thumb-empty{background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--gray-mid);}
+.gallery-card-footer{padding:6px 8px;display:flex;align-items:center;justify-content:space-between;}
+.gallery-card-title{font-family:var(--font-cond);font-size:12px;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;color:var(--black);}
+.gallery-card-count{font-family:var(--font-cond);font-size:10px;font-weight:700;color:var(--green);}
+.gallery-card.editing .gallery-card-title{color:var(--red);}
+.gallery-card.editing .gallery-card-count{color:var(--red);}
+.gallery-card.unsaved{border-color:rgba(160,92,0,0.3);}
+
+/* ── CURRENT BOX PANEL ── */
+.current-box-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.current-box-title{font-family:var(--font-cond);font-size:17px;font-weight:900;letter-spacing:0.03em;text-transform:uppercase;color:var(--black);}
+.edit-mode-badge{font-family:var(--font-cond);font-size:10px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;background:var(--red-lt);color:var(--red);border:1px solid var(--red-mid);border-radius:20px;padding:3px 9px;}
+
+/* ── BADGES ── */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-family:var(--font-cond);font-size:10px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;}
+.badge-red{background:var(--red-lt);color:var(--red);border:1px solid var(--red-mid);}
+.badge-green{background:var(--green-lt);color:var(--green);border:1px solid var(--green-mid);}
+.badge-gray{background:var(--gray-lt);color:var(--gray-dk);border:1px solid var(--gray-mid);}
+.badge-amber{background:var(--amber-lt);color:var(--amber);border:1px solid rgba(160,92,0,0.2);}
+
+/* ── MISC ── */
+.divider{height:1px;background:var(--border);margin:11px 0;}
+.sec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;}
+.sec-head h3{font-family:var(--font-cond);font-size:12px;font-weight:800;letter-spacing:0.07em;text-transform:uppercase;color:var(--text-dim);}
+.sum-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.sum-row:last-child{border-bottom:none;}
+.sum-lbl{color:var(--text-dim);font-weight:500;}
+.sum-val{font-weight:700;color:var(--text);}
+.bottom-safe{height:env(safe-area-inset-bottom,10px);flex-shrink:0;}
+.mono{font-family:var(--font-mono);}
+.confirm-hero{background:var(--black);border-radius:var(--radius);padding:16px;border-left:4px solid var(--red);}
+.confirm-hero-sub{font-family:var(--font-cond);font-size:10px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.38);margin-bottom:4px;}
+.confirm-hero-num{font-family:var(--font-mono);font-size:22px;font-weight:600;color:var(--red);letter-spacing:0.02em;}
+
+/* ── TOAST ── */
+#toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(90px);background:var(--black);color:#fff;padding:10px 18px;border-radius:30px;font-family:var(--font-cond);font-size:12px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;box-shadow:var(--shadow-lg);z-index:9999;transition:transform .3s cubic-bezier(.34,1.56,.64,1);white-space:nowrap;max-width:92vw;overflow:hidden;text-overflow:ellipsis;border-left:4px solid var(--gray);pointer-events:none;}
+#toast.show{transform:translateX(-50%) translateY(0);}
+#toast.t-ok{border-left-color:var(--green);}
+#toast.t-err{border-left-color:var(--red);}
+
+/* ── LOADING ── */
+#overlay{position:fixed;inset:0;background:rgba(244,244,245,0.9);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;flex-direction:column;gap:13px;z-index:8888;}
+#overlay.show{display:flex;}
+.spinner{width:36px;height:36px;border:3px solid var(--gray-mid);border-top-color:var(--red);border-radius:50%;animation:spin .75s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.overlay-txt{font-family:var(--font-cond);font-size:12px;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-dim);}
+
+/* ── DIALOG ── */
+#dialog-bg{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:none;align-items:flex-end;justify-content:center;z-index:7777;padding-bottom:env(safe-area-inset-bottom,0);}
+#dialog-bg.show{display:flex;}
+#dialog{background:var(--surface);border-radius:var(--radius-lg) var(--radius-lg) 0 0;padding:24px 20px 28px;width:100%;max-width:480px;box-shadow:var(--shadow-lg);}
+#dialog h3{font-family:var(--font-cond);font-size:18px;font-weight:900;letter-spacing:0.03em;text-transform:uppercase;color:var(--black);margin-bottom:8px;}
+#dialog p{font-size:14px;color:var(--text-dim);line-height:1.6;margin-bottom:20px;}
+#dialog .btn-row{gap:10px;}
+
+/* ── LOGIN ── */
+#screen-login{background:var(--black);align-items:center;justify-content:center;}
+.login-card{width:calc(100% - 36px);max-width:340px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-top:4px solid var(--red);border-radius:var(--radius-lg);padding:32px 24px;display:flex;flex-direction:column;align-items:center;gap:20px;box-shadow:0 24px 64px rgba(0,0,0,0.5);}
+.login-title{font-family:var(--font-cond);font-size:20px;font-weight:900;letter-spacing:0.04em;text-transform:uppercase;color:#fff;text-align:center;line-height:1.2;}
+.login-title em{color:var(--red);font-style:normal;}
+.login-sub{font-size:13px;color:rgba(255,255,255,0.38);text-align:center;line-height:1.6;margin-top:-8px;}
+.btn-ms{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;padding:13px 16px;background:var(--red);color:#fff;border-radius:var(--radius-sm);font-family:var(--font-cond);font-size:16px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;cursor:pointer;box-shadow:0 4px 16px rgba(204,31,39,0.38);transition:all .15s;}
+.btn-ms:hover{background:var(--red-dk);}
+.btn-ms:active{transform:scale(0.97);}
+.login-footer{font-size:11px;color:rgba(255,255,255,0.18);text-align:center;font-family:var(--font-cond);letter-spacing:0.04em;}
+
+/* ── RECENT ORDERS SCREEN ── */
+.order-list{display:flex;flex-direction:column;gap:8px;}
+.order-row{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:14px 16px;
+  display:flex;align-items:center;gap:12px;
+  cursor:pointer;transition:all .15s;box-shadow:var(--shadow-sm);
+}
+.order-row:hover{border-color:var(--red);box-shadow:var(--shadow);}
+.order-row:active{transform:scale(0.98);}
+.order-row-left{flex:1;min-width:0;}
+.order-row-num{
+  font-family:var(--font-mono);font-size:15px;font-weight:600;
+  color:var(--black);margin-bottom:3px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.order-row-meta{font-size:12px;color:var(--text-dim);line-height:1.5;}
+.order-row-right{
+  display:flex;flex-direction:column;align-items:flex-end;gap:3px;
+  flex-shrink:0;
+}
+.order-row-photos{
+  font-family:var(--font-cond);font-size:13px;font-weight:800;
+  letter-spacing:0.04em;color:var(--red);
+}
+.order-row-date{font-size:11px;color:var(--text-muted);}
+.order-row-chevron{color:var(--gray-mid);font-size:18px;flex-shrink:0;}
+.search-wrap{position:relative;}
+.search-wrap input{padding-left:36px;}
+.search-icon{
+  position:absolute;left:11px;top:50%;transform:translateY(-50%);
+  font-size:15px;color:var(--text-muted);pointer-events:none;
+}
+.count-toggle{display:flex;gap:6px;flex-wrap:wrap;}
+.count-pill{
+  padding:5px 13px;border-radius:20px;cursor:pointer;
+  font-family:var(--font-cond);font-size:12px;font-weight:800;
+  letter-spacing:0.04em;text-transform:uppercase;
+  border:1.5px solid var(--border);color:var(--text-muted);
+  background:var(--surface2);transition:all .15s;
+}
+.count-pill.active{border-color:var(--red);color:var(--red);background:var(--red-lt);}
+.empty-state{
+  text-align:center;padding:40px 20px;
+  font-family:var(--font-cond);font-size:14px;font-weight:700;
+  letter-spacing:0.04em;text-transform:uppercase;color:var(--text-muted);
+}
+.empty-state .empty-icon{font-size:36px;margin-bottom:10px;}
+
+/* ── REOPEN REASON SCREEN ── */
+.reason-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-top:4px solid var(--amber);border-radius:var(--radius);
+  padding:18px;box-shadow:var(--shadow-sm);
+}
+.reason-order-num{
+  font-family:var(--font-mono);font-size:20px;font-weight:600;
+  color:var(--black);margin-bottom:4px;
+}
+.reason-order-meta{font-size:13px;color:var(--text-dim);margin-bottom:16px;}
+.warning-box{
+  background:var(--amber-lt);border:1px solid rgba(160,92,0,0.25);
+  border-radius:var(--radius-sm);padding:12px 14px;
+  font-size:13px;color:var(--amber);line-height:1.6;
+  display:flex;gap:9px;align-items:flex-start;margin-bottom:16px;
+}
+.warning-icon{font-size:16px;flex-shrink:0;margin-top:1px;}
+
+/* ── ORDER DETAIL SCREEN ── */
+.box-section{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-sm);
+}
+.box-section-header{
+  background:var(--black);padding:12px 16px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.box-section-title{
+  font-family:var(--font-cond);font-size:14px;font-weight:800;
+  letter-spacing:0.06em;text-transform:uppercase;color:#fff;
+}
+.box-section-count{
+  font-family:var(--font-cond);font-size:11px;font-weight:700;
+  color:rgba(255,255,255,0.5);
+}
+.box-section-body{padding:14px;}
+.photo-type-label{
+  font-family:var(--font-cond);font-size:10px;font-weight:800;
+  letter-spacing:0.12em;text-transform:uppercase;
+  color:var(--text-muted);margin-bottom:8px;margin-top:10px;
+}
+.photo-type-label:first-child{margin-top:0;}
+.detail-thumb{
+  position:relative;aspect-ratio:1;border-radius:var(--radius-sm);
+  overflow:hidden;background:var(--surface2);border:1px solid var(--border);
+  cursor:pointer;transition:opacity .15s;
+}
+.detail-thumb:hover{opacity:0.85;}
+.detail-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+.thumb-spinner{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  font-size:18px;opacity:0.4;pointer-events:none;
+}
+.detail-thumb.thumb-loaded .thumb-spinner{display:none;}
+.detail-thumb.thumb-failed .thumb-spinner{font-size:22px;opacity:0.35;}
+.detail-thumb-label{
+  position:absolute;bottom:0;left:0;right:0;
+  background:rgba(0,0,0,0.62);
+  font-family:var(--font-cond);font-size:9px;font-weight:700;
+  letter-spacing:0.05em;text-transform:uppercase;
+  color:#fff;padding:3px 4px;text-align:center;
+}
+.late-tag{
+  position:absolute;top:3px;left:3px;
+  background:var(--amber);border-radius:3px;
+  font-family:var(--font-cond);font-size:8px;font-weight:800;
+  letter-spacing:0.04em;text-transform:uppercase;
+  color:#fff;padding:2px 5px;
+}
+.no-photos{
+  font-size:12px;color:var(--text-muted);
+  padding:10px 0;text-align:center;
+  font-family:var(--font-cond);letter-spacing:0.04em;
+  text-transform:uppercase;
+}
+.detail-meta-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;
+}
+.detail-meta-row:last-child{border-bottom:none;}
+.detail-meta-lbl{color:var(--text-dim);font-weight:500;}
+.detail-meta-val{font-weight:700;color:var(--text);text-align:right;max-width:60%;}
+.reopen-divider{
+  display:flex;align-items:center;gap:10px;margin:4px 0;
+}
+.reopen-divider::before,.reopen-divider::after{
+  content:'';flex:1;height:1px;background:var(--border);
+}
+.reopen-divider-text{
+  font-family:var(--font-cond);font-size:10px;font-weight:700;
+  letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted);
+  white-space:nowrap;
+}
+
+/* ── DUPLICATE WARNING ── */
+#dup-dialog-bg{position:fixed;inset:0;background:rgba(0,0,0,0.55);display:none;align-items:flex-end;justify-content:center;z-index:8000;padding-bottom:env(safe-area-inset-bottom,0);}
+#dup-dialog-bg.show{display:flex;}
+#dup-dialog{background:var(--surface);border-radius:var(--radius-lg) var(--radius-lg) 0 0;padding:20px 18px 24px;width:100%;max-width:480px;box-shadow:var(--shadow-lg);max-height:85vh;overflow-y:auto;}
+#dup-dialog h3{font-family:var(--font-cond);font-size:17px;font-weight:900;letter-spacing:0.03em;text-transform:uppercase;color:var(--black);margin-bottom:6px;}
+#dup-dialog .dup-sub{font-size:13px;color:var(--text-dim);line-height:1.5;margin-bottom:14px;}
+.dup-shipment-list{display:flex;flex-direction:column;gap:8px;margin-bottom:16px;}
+.dup-shipment-row{
+  background:var(--surface2);border:1.5px solid var(--border);
+  border-radius:var(--radius);padding:12px 14px;
+  display:flex;align-items:center;justify-content:space-between;
+  cursor:pointer;transition:all .15s;
+}
+.dup-shipment-row:hover{border-color:var(--red);}
+.dup-shipment-row.selected{border-color:var(--red);background:var(--red-lt);}
+.dup-ship-left{}
+.dup-ship-id{font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--black);}
+.dup-ship-meta{font-size:11px;color:var(--text-dim);margin-top:2px;}
+.dup-ship-photos{font-family:var(--font-cond);font-size:12px;font-weight:800;color:var(--red);}
+.dup-action-label{font-family:var(--font-cond);font-size:10px;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;}
+.dup-actions{display:flex;flex-direction:column;gap:8px;}
+.dup-divider{display:flex;align-items:center;gap:8px;margin:6px 0;}
+.dup-divider::before,.dup-divider::after{content:'';flex:1;height:1px;background:var(--border);}
+.dup-divider span{font-family:var(--font-cond);font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted);white-space:nowrap;}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ══ LOGIN ══ -->
+<div id="screen-login" class="screen active">
+  <div class="login-card">
+    <div>
+      <div class="login-title">Shipping<br/><em>Photo Capture</em></div>
+      <div class="login-sub" style="margin-top:8px;">Sign in with your Microsoft 365 account.</div>
+    </div>
+    <button class="btn-ms" id="btn-signin" onclick="signIn()" disabled style="opacity:0.6;cursor:not-allowed;">
+      <svg width="18" height="18" viewBox="0 0 21 21" fill="none"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
+      Initializing…
+    </button>
+    <div class="login-footer">360 Yield Center &nbsp;·&nbsp; Shipping App &nbsp;·&nbsp; Gen 1</div>
+  </div>
+</div>
+
+<!-- ══ SCAN ══ -->
+<div id="screen-scan" class="screen">
+  <div class="app-header">
+    <div class="h-left">
+      <div class="h-sub">Shipping</div>
+    </div>
+    <div class="h-right">
+      <div class="user-chip"><div class="user-av" id="av-scan"></div><div class="user-name" id="nm-scan"></div></div>
+      <button class="btn-icon" title="Sign out" onclick="signOut()">⏏</button>
+    </div>
+  </div>
+  <div class="screen-body">
+    <div class="scan-zone" id="scan-zone" onclick="startScanner()">
+      <div class="scan-icon">📷</div>
+      <h3>Scan Picking Ticket</h3>
+      <p>Tap to open camera and scan the GP order number barcode.</p>
+    </div>
+    <div id="scanner-wrap" style="display:none;">
+      <div class="card" style="padding:11px;">
+        <div class="card-label">Point camera at barcode</div>
+        <div class="camera-wrap">
+          <video id="scan-video" autoplay playsinline muted></video>
+          <div class="cam-overlay"><div class="cam-xhair-bar"></div></div>
+          <div class="cam-hint">Align barcode in frame</div>
+        </div>
+        <button class="btn btn-outline" style="margin-top:9px;" onclick="stopScanner()">✕ &nbsp;Cancel Scanner</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-label">Or enter order number manually</div>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="order-input" placeholder="e.g. OPSORD0012345" style="flex:1;text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')submitOrderEntry()"/>
+        <button class="btn btn-primary btn-sm" onclick="submitOrderEntry()">Go →</button>
+      </div>
+    </div>
+    <button class="btn btn-outline" onclick="showRecentOrders()" style="margin-top:0;">
+      🕐 &nbsp;Recent Orders
+    </button>
+    <div class="bottom-safe"></div>
+  </div>
+</div>
+
+<!-- ══ RECENT ORDERS ══ -->
+<div id="screen-recent" class="screen">
+  <div class="app-header">
+    <div class="h-left">
+      <button class="back-btn" onclick="goBack('screen-scan')">← Back</button>
+      <div class="h-sub">Recent Orders</div>
+    </div>
+    <div class="h-right">
+      <div class="user-chip"><div class="user-av" id="av-recent"></div><div class="user-name" id="nm-recent"></div></div>
+    </div>
+  </div>
+  <div class="screen-body">
+    <!-- Search -->
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="recent-search" placeholder="Search by order number…"
+        oninput="filterRecentOrders(this.value)"
+        style="text-transform:uppercase;"
+        oninput="this.value=this.value.toUpperCase();filterRecentOrders(this.value)"/>
+    </div>
+
+    <!-- Count toggle -->
+    <div class="card" style="padding:12px 14px;">
+      <div class="card-label" style="margin-bottom:8px;">Show</div>
+      <div class="count-toggle">
+        <div class="count-pill" onclick="setRecentCount(10)" id="pill-10">10</div>
+        <div class="count-pill active" onclick="setRecentCount(20)" id="pill-20">20</div>
+        <div class="count-pill" onclick="setRecentCount(50)" id="pill-50">50</div>
+        <div class="count-pill" onclick="setRecentCount(100)" id="pill-100">All</div>
+      </div>
+    </div>
+
+    <!-- Order list -->
+    <div id="recent-list">
+      <div class="empty-state">
+        <div class="empty-icon">📦</div>
+        Loading recent orders…
+      </div>
+    </div>
+
+    <div class="bottom-safe"></div>
+  </div>
+</div>
+
+<!-- ══ ORDER DETAIL ══ -->
+<div id="screen-detail" class="screen">
+  <div class="app-header">
+    <div class="h-left">
+      <button class="back-btn" onclick="goBack('screen-recent')">← Back</button>
+      <div class="h-sub" id="detail-header-num">Order</div>
+    </div>
+    <div class="h-right">
+      <button class="btn-icon" title="Open in SharePoint" onclick="openDetailInSharePoint()">🔗</button>
+    </div>
+  </div>
+  <div class="screen-body">
+
+    <!-- Order summary card -->
+    <div class="card" style="border-top:3px solid var(--red);">
+      <div class="card-label">Order Summary</div>
+      <div class="detail-meta-row"><span class="detail-meta-lbl">Order Number</span><span class="detail-meta-val mono" id="detail-order-num">—</span></div>
+      <div class="detail-meta-row"><span class="detail-meta-lbl">Package Type</span><span class="detail-meta-val" id="detail-pkg-type">—</span></div>
+      <div class="detail-meta-row"><span class="detail-meta-lbl">Total Packages</span><span class="detail-meta-val" id="detail-box-count">—</span></div>
+      <div class="detail-meta-row"><span class="detail-meta-lbl">Total Photos</span><span class="detail-meta-val" id="detail-photo-count">—</span></div>
+      <div class="detail-meta-row"><span class="detail-meta-lbl">Packed By</span><span class="detail-meta-val" id="detail-packed-by">—</span></div>
+      <div class="detail-meta-row"><span class="detail-meta-lbl">Date</span><span class="detail-meta-val" id="detail-date">—</span></div>
+    </div>
+
+    <!-- Box photo sections (populated dynamically) -->
+    <div id="detail-boxes">
+      <div class="empty-state"><div class="empty-icon">⏳</div>Loading photos…</div>
+    </div>
+
+    <!-- Divider before reopen -->
+    <div class="reopen-divider">
+      <div class="reopen-divider-text">Make changes to this order</div>
+    </div>
+
+    <button class="btn btn-outline" onclick="startReopenFlow()" style="border-color:var(--amber);color:var(--amber);">
+      ✏️ &nbsp;Re-open Order to Add Photos
+    </button>
+
+    <div class="bottom-safe"></div>
+  </div>
+</div>
+
+<!-- ══ REOPEN REASON ══ -->
+<div id="screen-reason" class="screen">
+  <div class="app-header">
+    <div class="h-left">
+      <button class="back-btn" onclick="goBack('screen-detail')">← Back</button>
+      <div class="h-sub">Re-open Order</div>
+    </div>
+  </div>
+  <div class="screen-body">
+
+    <div class="reason-card">
+      <div class="reason-order-num" id="reason-order-num">—</div>
+      <div class="reason-order-meta" id="reason-order-meta">—</div>
+      <div class="warning-box">
+        <span class="warning-icon">⚠️</span>
+        <span>You are about to re-open a completed order. Any photos you add will be permanently recorded with your name, the date, and the reason selected below.</span>
+      </div>
+      <div class="field-group" style="margin-bottom:12px;">
+        <div class="field-label">Reason for re-opening</div>
+        <select id="reason-code" onchange="checkReasonNote()">
+          <option value="">— Select a reason —</option>
+          <option value="Repack">Repack</option>
+          <option value="Additional Item">Additional Item</option>
+          <option value="Quality Check">Quality Check</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="field-group" id="reason-note-wrap" style="display:none;margin-bottom:12px;">
+        <div class="field-label">Please describe <span style="color:var(--red);">*</span></div>
+        <input type="text" id="reason-note" placeholder="Briefly describe why you are adding photos…" maxlength="200"/>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="btn-confirm-reopen" onclick="confirmReopen()" disabled style="opacity:0.5;">
+      Re-open &amp; Add Photos →
+    </button>
+    <button class="btn btn-outline" onclick="goBack('screen-detail')">Cancel</button>
+
+    <div class="bottom-safe"></div>
+  </div>
+</div>
+
+<!-- ══ CONFIRM ══ -->
+<div id="screen-confirm" class="screen">
+  <div class="app-header">
+    <div class="h-left"><button class="back-btn" onclick="goBack('screen-scan')">← Back</button></div>
+    <div class="h-right"><div class="user-chip"><div class="user-av" id="av-confirm"></div><div class="user-name" id="nm-confirm"></div></div></div>
+  </div>
+  <div class="step-bar">
+    <div class="step done"><div class="step-dot"><span>1</span></div><div class="step-lbl">Scan</div></div>
+    <div class="step active"><div class="step-dot"><span>2</span></div><div class="step-lbl">Confirm</div></div>
+    <div class="step"><div class="step-dot"><span>3</span></div><div class="step-lbl">Package</div></div>
+    <div class="step"><div class="step-dot"><span>4</span></div><div class="step-lbl">Photos</div></div>
+    <div class="step"><div class="step-dot"><span>5</span></div><div class="step-lbl">Done</div></div>
+  </div>
+  <div class="screen-body">
+    <div class="confirm-hero">
+      <div class="confirm-hero-sub">GP Order Number</div>
+      <div class="confirm-hero-num" id="confirm-num">—</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Verify before continuing</div>
+      <p style="font-size:13px;color:var(--text-dim);line-height:1.6;margin-bottom:13px;">Confirm this order number matches your picking ticket. All photos will be filed under this number.</p>
+      <div class="btn-row">
+        <button class="btn btn-outline" onclick="goBack('screen-scan')" style="flex:1;">← Re-scan</button>
+        <button class="btn btn-primary" onclick="showScreen('screen-package')" style="flex:2;">Confirm & Continue →</button>
+      </div>
+    </div>
+    <div class="bottom-safe"></div>
+  </div>
+</div>
+
+<!-- ══ PACKAGE SETUP ══ -->
+<div id="screen-package" class="screen">
+  <div class="app-header">
+    <div class="h-left">
+      <button class="back-btn" onclick="goBack('screen-confirm')">← Back</button>
+      <div class="h-sub" id="pkg-order-label"></div>
+    </div>
+    <div class="h-right"><div class="user-chip"><div class="user-av" id="av-pkg"></div><div class="user-name" id="nm-pkg"></div></div></div>
+  </div>
+  <div class="step-bar">
+    <div class="step done"><div class="step-dot"><span>1</span></div><div class="step-lbl">Scan</div></div>
+    <div class="step done"><div class="step-dot"><span>2</span></div><div class="step-lbl">Confirm</div></div>
+    <div class="step active"><div class="step-dot"><span>3</span></div><div class="step-lbl">Package</div></div>
+    <div class="step"><div class="step-dot"><span>4</span></div><div class="step-lbl">Photos</div></div>
+    <div class="step"><div class="step-dot"><span>5</span></div><div class="step-lbl">Done</div></div>
+  </div>
+  <div class="screen-body">
+    <div class="card" style="border-top:3px solid var(--red);">
+      <div class="card-label">Package Configuration</div>
+      <div class="field-group">
+        <div class="field-label">Package Type for this Shipment</div>
+        <select id="pkg-type">
+          <option value="Box">📦  Box / Parcel</option>
+          <option value="Pallet">🟫  Pallet</option>
+        </select>
+      </div>
+      <p style="font-size:12px;color:var(--text-muted);margin-top:10px;line-height:1.5;">If the package type needs to change mid-shipment, delete this order and start over.</p>
+    </div>
+    <button class="btn btn-primary" onclick="startPhotos()">Start Photo Capture →</button>
+    <div class="bottom-safe"></div>
+  </div>
+</div>
+
+<!-- ══ PHOTOS ══ -->
+<div id="screen-photos" class="screen">
+  <div class="app-header">
+    <div class="h-left">
+      <div class="h-sub" id="photo-order-label"></div>
+    </div>
+    <div class="h-right">
+      <span class="badge badge-gray" id="photo-type-badge">Box</span>
+      <button class="btn-icon" title="Sign out" onclick="signOut()">⏏</button>
+    </div>
+  </div>
+  <div class="step-bar">
+    <div class="step done"><div class="step-dot"><span>1</span></div><div class="step-lbl">Scan</div></div>
+    <div class="step done"><div class="step-dot"><span>2</span></div><div class="step-lbl">Confirm</div></div>
+    <div class="step done"><div class="step-dot"><span>3</span></div><div class="step-lbl">Package</div></div>
+    <div class="step active"><div class="step-dot"><span>4</span></div><div class="step-lbl">Photos</div></div>
+    <div class="step"><div class="step-dot"><span>5</span></div><div class="step-lbl">Done</div></div>
+  </div>
+
+  <div class="screen-body">
+
+    <!-- COMPLETED GALLERY -->
+    <div class="card" id="gallery-card" style="display:none;">
+      <div class="card-label">All packages — tap to switch</div>
+      <div class="gallery-scroll" id="gallery-scroll"></div>
+    </div>
+
+    <!-- CAMERA (hidden until active) -->
+    <div id="photo-cam-wrap" style="display:none;">
+      <div class="card" style="padding:11px;">
+        <div class="card-label" id="cam-type-label">Contents Photo</div>
+        <div class="camera-wrap">
+          <video id="photo-video" autoplay playsinline muted></video>
+          <div class="cam-overlay"><div class="cam-xhair-sq"></div></div>
+        </div>
+        <div class="btn-row" style="margin-top:9px;">
+          <button class="btn btn-outline" onclick="stopPhotoCamera()">✕ Cancel</button>
+          <button class="btn btn-primary" onclick="capturePhoto()">📸 Capture</button>
+        </div>
+        <canvas id="capture-canvas"></canvas>
+      </div>
+    </div>
+
+    <!-- CURRENT BOX -->
+    <div class="card" style="border-top:3px solid var(--red);">
+      <div class="current-box-header">
+        <div class="current-box-title" id="current-box-title">Box 1</div>
+        <span class="edit-mode-badge" id="edit-mode-badge" style="display:none;">Editing</span>
+      </div>
+
+      <!-- Contents -->
+      <div class="sec-head">
+        <h3>Contents Photos</h3>
+        <span class="badge badge-gray" id="contents-count-badge">0 photos</span>
+      </div>
+      <div class="photo-grid" id="grid-contents"></div>
+      <button class="btn btn-outline btn-sm" id="btn-add-contents" onclick="openPhotoCamera('contents')">📷 &nbsp;Add Contents Photo</button>
+
+      <div class="divider"></div>
+
+      <!-- Final -->
+      <div class="sec-head">
+        <h3>Final / Sealed Package Photo</h3>
+        <span class="badge badge-gray" id="final-count-badge">0 photos</span>
+      </div>
+      <div class="photo-grid" id="grid-final"></div>
+      <button class="btn btn-outline btn-sm" id="btn-add-final" onclick="openPhotoCamera('final')">📷 &nbsp;Add Final Photo</button>
+
+      <div style="margin-top:13px;">
+        <button class="btn btn-success" id="btn-save-box" onclick="saveBox()" disabled>✅ &nbsp;Save &amp; Upload This Package</button>
+      </div>
+    </div>
+
+    <!-- ADD BOX -->
+    <button class="btn btn-ghost" id="btn-add-box" onclick="addBox()" style="display:none;">+ &nbsp;Add Another Package</button>
+
+    <!-- SUBMIT -->
+    <button class="btn btn-primary" id="btn-submit" onclick="submitOrder()" disabled style="opacity:0.5;">🚀 &nbsp;Submit &amp; Complete Order</button>
+
+    <div class="bottom-safe"></div>
+  </div>
+</div>
+
+<!-- ══ COMPLETE ══ -->
+<div id="screen-complete" class="screen">
+  <div class="app-header">
+    <div class="h-left">
+      <div class="h-sub" style="color:rgba(255,255,255,0.6);">Shipment Saved</div>
+    </div>
+  </div>
+  <div class="screen-body" style="align-items:center;justify-content:center;text-align:center;">
+    <div style="font-size:64px;line-height:1;margin-bottom:10px;">✅</div>
+    <div style="font-family:var(--font-cond);font-size:24px;font-weight:900;letter-spacing:0.04em;text-transform:uppercase;color:var(--black);margin-bottom:8px;">Shipment Recorded</div>
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.6;max-width:260px;margin:0 auto 20px;">All photos saved to SharePoint. Office staff can access them now.</div>
+    <div class="card" style="width:100%;max-width:380px;text-align:left;">
+      <div class="card-label">Summary</div>
+      <div class="sum-row"><span class="sum-lbl">Order</span><span class="sum-val mono" id="done-order">—</span></div>
+      <div class="sum-row"><span class="sum-lbl">Package Type</span><span class="sum-val" id="done-type">—</span></div>
+      <div class="sum-row"><span class="sum-lbl">Total Packages</span><span class="sum-val" id="done-count">—</span></div>
+      <div class="sum-row"><span class="sum-lbl">Total Photos</span><span class="sum-val" id="done-photos">—</span></div>
+      <div class="sum-row"><span class="sum-lbl">Saved By</span><span class="sum-val" id="done-user">—</span></div>
+      <div class="sum-row"><span class="sum-lbl">Date / Time</span><span class="sum-val" id="done-time">—</span></div>
+    </div>
+    <div style="width:100%;max-width:380px;display:flex;flex-direction:column;gap:9px;margin-top:4px;">
+      <button class="btn btn-primary" onclick="newOrder()">📦 &nbsp;Scan Next Order</button>
+      <button class="btn btn-outline" onclick="viewSharePoint()">🔗 &nbsp;Open in SharePoint</button>
+    </div>
+    <div class="bottom-safe"></div>
+  </div>
+</div>
+
+
+<!-- ══ DUPLICATE ORDER DIALOG ══ -->
+<div id="dup-dialog-bg">
+  <div id="dup-dialog">
+    <h3>⚠️ Previous Shipment Found</h3>
+    <div class="dup-sub" id="dup-sub-text">This order number has been used before. Select what you'd like to do:</div>
+
+    <!-- List of existing shipments -->
+    <div class="dup-shipment-list" id="dup-shipment-list"></div>
+
+    <!-- Actions for selected shipment -->
+    <div id="dup-selected-actions" style="display:none;">
+      <div class="dup-action-label">With selected shipment:</div>
+      <div class="dup-actions">
+        <button class="btn btn-outline" onclick="dupViewPrevious()" style="font-size:14px;">
+          👁 &nbsp;View This Shipment (read-only)
+        </button>
+        <button class="btn btn-outline" onclick="dupAddToExisting()" style="font-size:14px;border-color:var(--amber);color:var(--amber);">
+          ✏️ &nbsp;Add Photos to This Shipment
+        </button>
+      </div>
+    </div>
+
+    <div class="dup-divider"><span>or start fresh</span></div>
+
+    <button class="btn btn-outline" onclick="dupStartNew()" style="font-size:13px;color:var(--text-dim);">
+      📦 &nbsp;Start a New Shipment Event
+      <span style="display:block;font-size:10px;font-weight:400;text-transform:none;letter-spacing:0;margin-top:1px;opacity:0.7;">(e.g. partial shipment, second run)</span>
+    </button>
+    <button class="btn btn-ghost" onclick="closeDupDialog()" style="margin-top:6px;font-size:13px;">
+      ← Cancel / Re-scan
+    </button>
+  </div>
+</div>
+
+</div><!-- /#app -->
+
+<!-- Overlay & Toast -->
+<div id="overlay"><div class="spinner"></div><div class="overlay-txt" id="overlay-txt">Loading…</div></div>
+<div id="toast"></div>
+
+<!-- Unsaved work dialog -->
+<div id="dialog-bg">
+  <div id="dialog">
+    <h3>Unsaved Photos</h3>
+    <p id="dialog-msg">You have unsaved photos on the current package. Save it before switching.</p>
+    <div class="btn-row">
+      <button class="btn btn-outline" onclick="closeDialog()">Cancel</button>
+      <button class="btn btn-primary" id="dialog-confirm-btn">Save Now</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+//  CONFIG — fill in before deploying
+// ═══════════════════════════════════════════════════
+const CFG = {
+  clientId:     'da9be312-c82f-422d-b3d4-73665a9ebab9',
+  tenantId:     '34dbc6c7-5283-4d1a-b7ec-1bb8bbc8ba6d',
+  redirectUri:  window.location.origin + window.location.pathname,
+  spSiteHost:   'encoregrowth.sharepoint.com',
+  spSitePath:   '/sites/WarehouseShipping',
+  listPackages: 'Shipment_Packages',
+  listPhotos:   'Package_Photos',
+  photoLibrary: 'ShipmentPhotos',
+  spSiteUrl:    'https://encoregrowth.sharepoint.com/sites/WarehouseShipping',
+};
+
+// ═══════════════════════════════════════════════════
+//  MSAL — initialized in DOMContentLoaded to ensure
+//  msal-browser.min.js is fully parsed before use
+// ═══════════════════════════════════════════════════
+let msalApp = null;
+// Separate login scopes from graph scopes for cleaner auth flow
+const loginScopes = ['User.Read'];
+const graphScopes = ['User.Read','Sites.ReadWrite.All','Files.ReadWrite.All'];
+
+// ═══════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════
+let S = {
+  user:null, token:null,
+  orderNum:null, pkgType:'Box',
+  shipmentId:null,      // e.g. ORDR00049707-S1
+  shipmentSeq:null,     // e.g. 1
+  // boxes[i] = { contents:[dataUrl], final:[dataUrl], saved:false, spItemId:null, newContents:[], newFinal:[] }
+  boxes:[], currentIdx:0,
+  photoTarget:null,
+  scanStream:null, photoStream:null,
+  spSiteId:null, spDriveId:null,
+  editingExisting:false,   // true when re-opening a saved box
+  pendingGalleryIdx:null,  // used by edge case dialog
+};
+
+let dupState = { shipments:[], selected:null, orderNum:null };
+
+// ═══════════════════════════════════════════════════
+//  AUTH
+// ═══════════════════════════════════════════════════
+async function signIn(){
+  try{
+    showOverlay('Signing in…');
+    // Login with User.Read only first — cleaner for tenant consent policies
+    await msalApp.loginRedirect({scopes: loginScopes});
+  }catch(e){
+    toast('Sign-in failed: '+e.message,'err');
+    hideOverlay();
+  }
+}
+
+async function getToken(){
+  try{
+    const r = await msalApp.acquireTokenSilent({scopes:graphScopes, account:S.user});
+    S.token=r.accessToken; return r.accessToken;
+  }catch{
+    // Silent failed — redirect to get full graph scopes
+    await msalApp.acquireTokenRedirect({scopes:graphScopes});
+    return null;
+  }
+}
+
+function signOut(){ resetState(); msalApp.logoutRedirect({postLogoutRedirectUri: window.location.origin + window.location.pathname}); }
+
+function onSignedIn(){
+  const name = S.user.name||S.user.username;
+  const initials = name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+  ['scan','confirm','pkg'].forEach(id=>{
+    const av=document.getElementById('av-'+id);
+    const nm=document.getElementById('nm-'+id);
+    if(av)av.textContent=initials;
+    if(nm)nm.textContent=name;
+  });
+  showScreen('screen-scan');
+}
+
+window.addEventListener('DOMContentLoaded', async()=>{
+  // Diagnostics — visible in browser console (F12)
+  console.log('Page URL:', window.location.href);
+  console.log('MSAL present?', typeof msal !== 'undefined');
+  console.log('ZXing present?', typeof ZXing !== 'undefined');
+  console.log('BarcodeDetector present?', 'BarcodeDetector' in window);
+  console.log('Redirect URI will be:', window.location.origin + window.location.pathname);
+
+  if(typeof msal === 'undefined'){
+    console.error('MSAL library failed to load');
+    alert('Authentication library failed to load. Please check your internet connection and refresh.');
+    return;
+  }
+
+  // Initialize MSAL with dynamic redirectUri — avoids any trailing slash or filename mismatch
+  msalApp = new msal.PublicClientApplication({
+    auth:{
+      clientId: CFG.clientId,
+      authority: `https://login.microsoftonline.com/${CFG.tenantId}`,
+      redirectUri: window.location.origin + window.location.pathname
+    },
+    cache:{ cacheLocation:'localStorage', storeAuthStateInCookie:true }
+  });
+
+  try{
+    await msalApp.initialize();
+    console.log('MSAL initialized OK');
+
+    // Enable sign in button now that MSAL is ready
+    const btn = document.getElementById('btn-signin');
+    if(btn){ btn.disabled=false; btn.style.opacity='1'; btn.style.cursor='pointer'; btn.innerHTML='<svg width="18" height="18" viewBox="0 0 21 21" fill="none"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg> Sign in with Microsoft'; }
+
+    // CRITICAL: must run on every page load to catch Microsoft's redirect back
+    const redirectResult = await msalApp.handleRedirectPromise();
+    console.log('Redirect result:', redirectResult ? 'received' : 'none');
+
+    if(redirectResult){
+      S.user=redirectResult.account;
+      S.token=redirectResult.accessToken;
+      onSignedIn();
+      return;
+    }
+
+    // Check for existing cached session
+    const accounts = msalApp.getAllAccounts();
+    console.log('Cached accounts:', accounts.length);
+
+    if(accounts.length>0){
+      S.user=accounts[0];
+      try{
+        await getToken();
+        onSignedIn();
+      }catch(e){
+        console.warn('Silent token failed, showing login:', e.message);
+        showScreen('screen-login');
+      }
+    } else {
+      showScreen('screen-login');
+    }
+  }catch(e){
+    console.error('Auth init error:', e);
+    alert('Auth error: ' + (e.errorCode || e.message || JSON.stringify(e)));
+    showScreen('screen-login');
+  }
+});
+
+// ═══════════════════════════════════════════════════
+//  BARCODE SCANNER
+// ═══════════════════════════════════════════════════
+let barcodeInterval=null;
+
+async function startScanner(){
+  document.getElementById('scan-zone').classList.add('scanning');
+  document.getElementById('scanner-wrap').style.display='block';
+  const video=document.getElementById('scan-video');
+  try{
+    S.scanStream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:'environment',width:{ideal:1280},height:{ideal:720}}
+    });
+    video.srcObject=S.scanStream;
+
+    // Wait for video to actually start playing before scanning
+    await new Promise(resolve=>{
+      if(video.readyState >= 2) resolve();
+      else video.addEventListener('loadeddata', resolve, {once:true});
+    });
+
+    // Check BarcodeDetector — on iOS 17+ this is natively available in Safari
+    if('BarcodeDetector' in window){
+      let supportedFormats = [];
+      try{
+        supportedFormats = await BarcodeDetector.getSupportedFormats();
+      } catch {
+        supportedFormats = ['code_128','code_39','qr_code'];
+      }
+      // Use supported formats, always include qr_code as fallback
+      const formatsToUse = supportedFormats.length > 0
+        ? supportedFormats.filter(f => ['code_128','code_39','code_93','ean_13','qr_code','pdf417'].includes(f))
+        : ['qr_code'];
+      if(formatsToUse.length === 0) formatsToUse.push('qr_code');
+
+      console.log('Using BarcodeDetector with formats:', formatsToUse);
+      const det = new BarcodeDetector({formats: formatsToUse});
+      const scanStart = performance.now();
+      barcodeInterval = setInterval(async()=>{
+        if(video.readyState < 2) return;
+        try{
+          const codes = await det.detect(video);
+          if(codes.length > 0){
+            const elapsed = ((performance.now()-scanStart)/1000).toFixed(2);
+            console.log(`Barcode detected in ${elapsed}s:`, codes[0].rawValue, codes[0].format);
+            handleScan(codes[0].rawValue);
+          }
+        } catch(e){ console.warn('Detect error:', e); }
+      }, 150);
+
+    } else if(typeof ZXing !== 'undefined'){
+      // ZXing fallback — loaded from local zxing.min.js
+      console.log('Using ZXing fallback');
+      const reader = new ZXing.BrowserMultiFormatReader();
+      reader.decodeFromVideoDevice(null, video, (result, err)=>{
+        if(result){
+          console.log('ZXing detected:', result.getText());
+          handleScan(result.getText());
+        }
+      });
+      window._zxReader = reader;
+
+    } else {
+      // Neither available — this should not happen if files are loaded correctly
+      console.error('No barcode library available. BarcodeDetector:', ('BarcodeDetector' in window), 'ZXing:', typeof ZXing);
+      toast('Scanner unavailable — type order number manually','err');
+      stopScanner();
+    }
+
+  }catch(e){
+    console.error('Scanner error:', e.name, e.message);
+    stopScanner();
+    if(e.name==='NotAllowedError'||e.name==='PermissionDeniedError'){
+      toast('Camera blocked — go to Settings > Safari > Camera > Allow','err');
+    } else {
+      toast('Camera unavailable — type order number manually','err');
+    }
+  }
+}
+
+function stopScanner(){
+  if(S.scanStream){S.scanStream.getTracks().forEach(t=>t.stop());S.scanStream=null;}
+  if(barcodeInterval){clearInterval(barcodeInterval);barcodeInterval=null;}
+  if(window._zxReader){window._zxReader.reset();window._zxReader=null;}
+  document.getElementById('scan-zone').classList.remove('scanning');
+  document.getElementById('scanner-wrap').style.display='none';
+}
+
+function handleScan(val){
+  stopScanner();
+  const cleaned=val.trim().toUpperCase();
+  document.getElementById('order-input').value=cleaned;
+  submitOrderEntry();
+}
+
+async function submitOrderEntry(){
+  const val = document.getElementById('order-input').value.trim().toUpperCase();
+  if(!val){
+    toast('Please enter or scan an order number','err');
+    return;
+  }
+
+  S.orderNum = val;
+
+  console.time('submitOrderEntry total');
+  showOverlay('Checking order…');
+  try{
+    console.time('getToken');
+    const token = await getToken();
+    console.timeEnd('getToken');
+
+    console.time('ensureSpIds');
+    await ensureSpIds(token);
+    console.timeEnd('ensureSpIds');
+
+    const existing = await fetchExistingShipments(token, val);
+    hideOverlay();
+    console.timeEnd('submitOrderEntry total');
+
+    if(existing.length > 0){
+      showDupDialog(val, existing);
+      return;
+    }
+
+    // First shipment for this order
+    S.shipmentSeq = 1;
+    S.shipmentId  = `${val}-S1`;
+    S.isReopen    = false;
+    S.reopenCode  = '';
+    S.reopenNote  = '';
+
+    document.getElementById('confirm-num').textContent = val;
+    showScreen('screen-confirm');
+  }catch(e){
+    hideOverlay();
+    console.timeEnd('submitOrderEntry total');
+    console.error('Duplicate check failed:', e);
+    const msg = e?.message || String(e);
+    toast(`Order check failed: ${msg}`, 'err');
+    return;
+  }
+}
+
+async function fetchExistingShipments(token, orderNum){
+  console.time('fetchExistingShipments total');
+
+  // ── Packages query ────────────────────────────────────────────
+  // Prefer server-side filter on GP_Order_Number (requires the column to
+  // be indexed in SharePoint). If the list isn't indexed yet, Graph returns
+  // a 400/"unsupportedQuery" — fall back to the old fetch-all-and-filter.
+  console.time('packages fetch');
+  const filterExpr = `fields/GP_Order_Number eq '${orderNum.replace(/'/g,"''")}'`;
+  const filteredUrl = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listPackages}/items`+
+    `?$expand=fields($select=GP_Order_Number,Shipment_ID,Shipment_Sequence,Package_Type,Box_Number,Packaging_User,Created)`+
+    `&$filter=${encodeURIComponent(filterExpr)}&$top=50`;
+  let res = await fetch(filteredUrl, {
+    headers:{ Authorization:`Bearer ${token}`, Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly' }
+  });
+  let items;
+  if(res.ok){
+    const data = await res.json();
+    items = data.value || [];
+    console.log(`[fast] packages filtered server-side: ${items.length} rows`);
+  } else {
+    // Fallback: fetch all and filter client-side (old behavior)
+    console.warn('Server-side filter rejected, falling back to full scan. Consider indexing GP_Order_Number in SharePoint for max speed.');
+    const fallbackUrl = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listPackages}/items`+
+      `?$expand=fields($select=GP_Order_Number,Shipment_ID,Shipment_Sequence,Package_Type,Box_Number,Packaging_User,Created)`+
+      `&$orderby=id desc&$top=500`;
+    const fbRes = await fetch(fallbackUrl, {
+      headers:{ Authorization:`Bearer ${token}`, Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly' }
+    });
+    if(!fbRes.ok){
+      const errText = await fbRes.text().catch(()=>'');
+      throw new Error(`SharePoint list fetch failed (${fbRes.status}): ${errText.slice(0,120)}`);
+    }
+    const data = await fbRes.json();
+    items = (data.value||[]).filter(i => i.fields?.GP_Order_Number === orderNum);
+  }
+  console.timeEnd('packages fetch');
+
+  // Group by Shipment_ID
+  const shipMap = {};
+  for(const item of items){
+    const f = item.fields;
+    const sid = f.Shipment_ID || (orderNum + '-S1'); // fallback for old records
+    if(!shipMap[sid]){
+      shipMap[sid] = {
+        shipmentId:  sid,
+        seq:         f.Shipment_Sequence || 1,
+        pkgType:     f.Package_Type || 'Box',
+        boxCount:    0,
+        packedBy:    f.Packaging_User || '—',
+        created:     f.Created || item.createdDateTime,
+        spItemIds:   [],
+      };
+    }
+    shipMap[sid].boxCount++;
+    shipMap[sid].spItemIds.push(item.id);
+  }
+
+  // Skip the photos query entirely if this order has no packages — there
+  // can't be any photos either, and we save a whole round-trip.
+  if(items.length === 0){
+    console.timeEnd('fetchExistingShipments total');
+    return [];
+  }
+
+  // ── Photos query ──────────────────────────────────────────────
+  console.time('photos fetch');
+  const pFilterExpr = `fields/GP_Order_Number eq '${orderNum.replace(/'/g,"''")}'`;
+  const pFilteredUrl = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listPhotos}/items`+
+    `?$expand=fields($select=GP_Order_Number,Shipment_ID)`+
+    `&$filter=${encodeURIComponent(pFilterExpr)}&$top=500`;
+  try{
+    let pRes = await fetch(pFilteredUrl, {
+      headers:{ Authorization:`Bearer ${token}`, Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly' }
+    });
+    let photoItems;
+    if(pRes.ok){
+      const pData = await pRes.json();
+      photoItems = pData.value || [];
+    } else {
+      // Fallback: fetch-all
+      const pFallbackUrl = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listPhotos}/items`+
+        `?$expand=fields($select=GP_Order_Number,Shipment_ID)&$top=500`;
+      const fbPRes = await fetch(pFallbackUrl, {
+        headers:{ Authorization:`Bearer ${token}`, Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly' }
+      });
+      if(fbPRes.ok){
+        const pData = await fbPRes.json();
+        photoItems = (pData.value||[]).filter(p => p.fields?.GP_Order_Number === orderNum);
+      } else {
+        photoItems = [];
+      }
+    }
+    for(const p of photoItems){
+      const sid = p.fields?.Shipment_ID || (orderNum+'-S1');
+      if(shipMap[sid]) shipMap[sid].photoCount = (shipMap[sid].photoCount||0)+1;
+    }
+  }catch(e){ console.warn('Photo count failed:', e); }
+  console.timeEnd('photos fetch');
+
+  console.timeEnd('fetchExistingShipments total');
+  return Object.values(shipMap).sort((a,b)=>b.seq-a.seq);
+}
+
+// ═══════════════════════════════════════════════════
+//  PACKAGE SETUP
+// ═══════════════════════════════════════════════════
+function startPhotos(){
+  S.pkgType=document.getElementById('pkg-type').value;
+  S.boxes=[];
+  S.currentIdx=0;
+  S.editingExisting=false;
+
+  // Assign shipment ID if not already set (no duplicates found)
+  if(!S.shipmentId){
+    S.shipmentSeq = 1;
+    S.shipmentId  = `${S.orderNum}-S1`;
+  }
+
+  // Set labels
+  document.getElementById('photo-order-label').textContent=S.orderNum;
+  document.getElementById('pkg-order-label').textContent=S.orderNum;
+  document.getElementById('photo-type-badge').textContent=S.pkgType;
+
+  // Start with box 1
+  S.boxes.push(newBox());
+  renderPhotoScreen();
+  showScreen('screen-photos');
+}
+
+function newBox(){
+  return { contents:[], final:[], saved:false, spItemId:null, newContents:[], newFinal:[] };
+}
+
+// ═══════════════════════════════════════════════════
+//  PHOTO CAMERA
+// ═══════════════════════════════════════════════════
+async function openPhotoCamera(target){
+  S.photoTarget=target;
+  document.getElementById('cam-type-label').textContent = target==='contents' ? 'Contents Photo' : 'Final / Sealed Package Photo';
+  document.getElementById('photo-cam-wrap').style.display='block';
+  const video=document.getElementById('photo-video');
+  try{
+    S.photoStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1920},height:{ideal:1080}}});
+    video.srcObject=S.photoStream;
+  }catch(e){ toast('Camera unavailable','err'); document.getElementById('photo-cam-wrap').style.display='none'; }
+}
+
+function stopPhotoCamera(){
+  if(S.photoStream){S.photoStream.getTracks().forEach(t=>t.stop());S.photoStream=null;}
+  document.getElementById('photo-cam-wrap').style.display='none';
+}
+
+function capturePhoto(){
+  const video=document.getElementById('photo-video');
+  const canvas=document.getElementById('capture-canvas');
+  canvas.width=video.videoWidth; canvas.height=video.videoHeight;
+  canvas.getContext('2d').drawImage(video,0,0);
+  const dataUrl=canvas.toDataURL('image/jpeg',0.88);
+  stopPhotoCamera();
+
+  const box=S.boxes[S.currentIdx];
+  if(S.photoTarget==='contents'){
+    box.contents.push(dataUrl);
+    if(box.saved) box.newContents.push(dataUrl);
+  } else {
+    box.final.push(dataUrl);
+    if(box.saved) box.newFinal.push(dataUrl);
+  }
+
+  renderPhotoGrids();
+  updateSaveBtn();
+  toast('Photo captured','ok');
+}
+
+function removePhoto(target,idx){
+  const box=S.boxes[S.currentIdx];
+  if(target==='contents') box.contents.splice(idx,1);
+  else box.final.splice(idx,1);
+  renderPhotoGrids();
+  updateSaveBtn();
+}
+
+// ═══════════════════════════════════════════════════
+//  RENDER
+// ═══════════════════════════════════════════════════
+function renderPhotoScreen(){
+  const idx=S.currentIdx;
+  const box=S.boxes[idx];
+  const label=S.pkgType;
+  const boxNum=idx+1;
+
+  // Current box title
+  document.getElementById('current-box-title').textContent=`${label} ${boxNum}`;
+
+  // Edit mode badge
+  const editBadge=document.getElementById('edit-mode-badge');
+  editBadge.style.display=box.saved?'inline-flex':'none';
+
+  // Show gallery when more than one box exists OR any box is saved
+  const galleryCard=document.getElementById('gallery-card');
+  const showGallery = S.boxes.length > 1 || S.boxes.some(b=>b.saved);
+  galleryCard.style.display=showGallery?'block':'none';
+  renderGallery();
+
+  // Add box button — show only if current box is saved
+  document.getElementById('btn-add-box').style.display=box.saved?'flex':'none';
+
+  // Submit button — active if at least one saved box
+  const submitBtn=document.getElementById('btn-submit');
+  const hasSaved=S.boxes.some(b=>b.saved);
+  submitBtn.disabled=!hasSaved;
+  submitBtn.style.opacity=hasSaved?'1':'0.5';
+
+  renderPhotoGrids();
+  updateSaveBtn();
+  stopPhotoCamera();
+}
+
+function renderGallery(){
+  const scroll=document.getElementById('gallery-scroll');
+  const label=S.pkgType;
+  scroll.innerHTML='';
+
+  S.boxes.forEach((box,i)=>{
+    const isEditing=(i===S.currentIdx);
+    const allPhotos=[...box.contents,...box.final];
+    const photoCount=box.contents.length+box.final.length;
+
+    const card=document.createElement('div');
+    card.className='gallery-card'+(isEditing?' editing':'')+(box.saved?'':' unsaved');
+    card.onclick=()=>tapGalleryBox(i);
+
+    // Thumb strip — show up to 4 photos in 2x2 grid
+    const strip=document.createElement('div');
+    strip.className='gallery-thumb-strip';
+    for(let t=0;t<4;t++){
+      const cell=document.createElement('div');
+      if(allPhotos[t]){
+        const img=document.createElement('img');
+        img.src=allPhotos[t]; img.loading='lazy';
+        cell.appendChild(img);
+      } else {
+        cell.className='gallery-thumb-empty';
+        cell.textContent=t===0?'📷':'';
+      }
+      strip.appendChild(cell);
+    }
+
+    const footer=document.createElement('div');
+    footer.className='gallery-card-footer';
+    footer.innerHTML=`<span class="gallery-card-title">${label} ${i+1}</span><span class="gallery-card-count" style="${box.saved?'':'color:var(--amber)'}">${box.saved?photoCount+' photo'+(photoCount!==1?'s':''):'Not saved'}</span>`;
+
+    card.appendChild(strip);
+    card.appendChild(footer);
+    scroll.appendChild(card);
+  });
+}
+
+function renderPhotoGrids(){
+  const box=S.boxes[S.currentIdx];
+  const locked=false; // never fully locked — can always add
+
+  const makeGrid=(photos,target,gridId)=>{
+    document.getElementById(gridId).innerHTML=photos.map((src,i)=>`
+      <div class="photo-thumb">
+        <img src="${src}" loading="lazy"/>
+        <button class="thumb-rm" onclick="removePhoto('${target}',${i})">✕</button>
+        <div class="thumb-label">${target==='contents'?'Contents':'Final'} ${i+1}</div>
+      </div>
+    `).join('');
+  };
+
+  makeGrid(box.contents,'contents','grid-contents');
+  makeGrid(box.final,'final','grid-final');
+
+  // Update count badges
+  document.getElementById('contents-count-badge').textContent=`${box.contents.length} photo${box.contents.length!==1?'s':''}`;
+  document.getElementById('final-count-badge').textContent=`${box.final.length} photo${box.final.length!==1?'s':''}`;
+}
+
+function updateSaveBtn(){
+  const box=S.boxes[S.currentIdx];
+  const btn=document.getElementById('btn-save-box');
+  const label=S.pkgType;
+  const boxNum=S.currentIdx+1;
+
+  if(box.saved){
+    // In edit mode — only enable if new photos have been added
+    const hasNew=(box.newContents.length+box.newFinal.length)>0;
+    btn.disabled=!hasNew;
+    btn.textContent=hasNew?`✅  Save New Photos to ${label} ${boxNum}`:`✓  ${label} ${boxNum} Already Saved`;
+    btn.className=hasNew?'btn btn-success':'btn btn-outline';
+  } else {
+    const hasPhotos=(box.contents.length+box.final.length)>0;
+    btn.disabled=!hasPhotos;
+    btn.textContent=`✅  Save & Upload ${label} ${boxNum}`;
+    btn.className='btn btn-success';
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  GALLERY TAP — edge case A
+// ═══════════════════════════════════════════════════
+function tapGalleryBox(idx){
+  if(idx===S.currentIdx) return; // already viewing it
+
+  const currentBox=S.boxes[S.currentIdx];
+  const currentHasUnsaved=!currentBox.saved && (currentBox.contents.length+currentBox.final.length)>0;
+  const currentEditHasNew=currentBox.saved && (currentBox.newContents.length+currentBox.newFinal.length)>0;
+
+  if(currentHasUnsaved||currentEditHasNew){
+    // Edge case A — prompt to save first
+    S.pendingGalleryIdx=idx;
+    const label=S.pkgType;
+    const num=S.currentIdx+1;
+    document.getElementById('dialog-msg').textContent=
+      `You have unsaved photos on ${label} ${num}. Save it before switching to another package.`;
+    document.getElementById('dialog-confirm-btn').onclick=async()=>{
+      closeDialog();
+      await saveBox();
+      if(S.boxes[S.currentIdx].saved){
+        switchToBox(S.pendingGalleryIdx);
+      }
+    };
+    document.getElementById('dialog-bg').classList.add('show');
+    return;
+  }
+
+  switchToBox(idx);
+}
+
+function switchToBox(idx){
+  S.currentIdx=idx;
+  S.editingExisting=S.boxes[idx].saved;
+  renderPhotoScreen();
+  // Scroll to top of body
+  document.querySelector('#screen-photos .screen-body').scrollTo({top:0,behavior:'smooth'});
+}
+
+function closeDialog(){
+  document.getElementById('dialog-bg').classList.remove('show');
+  S.pendingGalleryIdx=null;
+}
+
+// ═══════════════════════════════════════════════════
+//  ADD BOX
+// ═══════════════════════════════════════════════════
+function addBox(){
+  const currentBox=S.boxes[S.currentIdx];
+  if(!currentBox.saved){ toast('Save the current package first','err'); return; }
+  S.boxes.push(newBox());
+  S.currentIdx=S.boxes.length-1;
+  S.editingExisting=false;
+  renderPhotoScreen();
+  document.querySelector('#screen-photos .screen-body').scrollTo({top:9999,behavior:'smooth'});
+}
+
+// ═══════════════════════════════════════════════════
+//  SAVE BOX → Upload to SharePoint
+// ═══════════════════════════════════════════════════
+async function saveBox(){
+  const box=S.boxes[S.currentIdx];
+  const isEdit=box.saved;
+
+  if(!isEdit && box.contents.length===0 && box.final.length===0){
+    toast('Add at least one photo first','err'); return;
+  }
+  if(isEdit && box.newContents.length===0 && box.newFinal.length===0){
+    toast('No new photos to save','err'); return;
+  }
+
+  showOverlay('Uploading…');
+  try{
+    const token=await getToken();
+    const orderNum=S.orderNum;
+    const boxNum=S.currentIdx+1;
+    const pkgType=S.pkgType;
+    const userName=S.user.name||S.user.username;
+    const now=new Date().toISOString();
+
+    await ensureSpIds(token);
+
+    const folderPath = `${orderNum}/${S.shipmentId}/${pkgType}${boxNum}`;
+
+    if(!isEdit){
+      // New box — create list item first
+      const pkgItem = await spCreateListItem(token, CFG.listPackages, {
+  Title: `${orderNum}-${pkgType}${boxNum}`,
+  GP_Order_Number: orderNum,
+  Shipment_ID: S.shipmentId,
+  Shipment_Sequence: S.shipmentSeq,
+  Package_Type: pkgType,
+  Box_Number: boxNum,
+  Packaging_User: userName,
+});
+      box.spItemId=pkgItem.id;
+
+      // Upload all photos
+      let seq=1;
+      const upload=async(dataUrl,photoType)=>{
+        showOverlay(`Uploading ${photoType} photo ${seq}…`);
+        const blob=dataUrlToBlob(dataUrl);
+        const fileName=`${orderNum}_${pkgType}${boxNum}_${photoType}_${seq}_${Date.now()}.jpg`;
+        const spUrl=await spUploadFile(token,folderPath,fileName,blob);
+       const f = {
+  Title: fileName,
+  Package_ID: box.spItemId,
+  GP_Order_Number: orderNum,
+  Box_Number: boxNum,
+  Shipment_ID: S.shipmentId,
+  Photo_Type: photoType,
+  Photo_Sequence: seq,
+  SharePoint_URL: spUrl,
+  File_Name: fileName,
+  Captured_By: userName,
+  Captured_DateTime: now,
+  Added_After_Completion: false,
+  Reason_Code: '',
+  Reason_Note: '',
+};
+await spCreateListItem(token, CFG.listPhotos, f);
+        seq++;
+      };
+      for(const p of box.contents) await upload(p,'Contents');
+      for(const p of box.final)    await upload(p,'Final');
+
+      box.saved=true;
+      box.newContents=[]; box.newFinal=[];
+      toast(`${pkgType} ${boxNum} saved!`,'ok');
+
+    } else {
+      // Edit mode — only upload new photos
+      // Find highest existing sequence by counting already-uploaded photos
+      let seq=box.contents.length-box.newContents.length+box.final.length-box.newFinal.length+1;
+      const uploadNew=async(dataUrl,photoType)=>{
+        showOverlay(`Adding ${photoType} photo…`);
+        const blob=dataUrlToBlob(dataUrl);
+        const fileName=`${orderNum}_${pkgType}${boxNum}_${photoType}_${seq}_${Date.now()}.jpg`;
+        const spUrl=await spUploadFile(token,folderPath,fileName,blob);
+       await spCreateListItem(token, CFG.listPhotos, {
+  Title: fileName,
+  Package_ID: box.spItemId,
+  GP_Order_Number: orderNum,
+  Box_Number: boxNum,
+  Shipment_ID: S.shipmentId,
+  Photo_Type: photoType,
+  Photo_Sequence: seq,
+  SharePoint_URL: spUrl,
+  File_Name: fileName,
+  Captured_By: userName,
+  Captured_DateTime: now,
+  Added_After_Completion: true,
+  Reason_Code: S.isReopen ? (S.reopenCode || '') : '',
+  Reason_Note: S.isReopen ? (S.reopenNote || '') : '',
+});
+        seq++;
+      };
+      for(const p of box.newContents) await uploadNew(p,'Contents');
+      for(const p of box.newFinal)    await uploadNew(p,'Final');
+
+      box.newContents=[]; box.newFinal=[];
+      toast(`Photos added to ${pkgType} ${boxNum}`,'ok');
+    }
+
+    renderPhotoScreen();
+
+  }catch(e){
+    console.error(e);
+    toast('Upload failed: '+e.message,'err');
+  }finally{ hideOverlay(); }
+}
+
+// ═══════════════════════════════════════════════════
+//  SUBMIT ORDER
+// ═══════════════════════════════════════════════════
+function submitOrder(){
+  const hasSaved=S.boxes.some(b=>b.saved);
+  if(!hasSaved){ toast('Save at least one package first','err'); return; }
+
+  const totalPhotos=S.boxes.reduce((acc,b)=>acc+b.contents.length+b.final.length,0);
+  document.getElementById('done-order').textContent=S.orderNum;
+  document.getElementById('done-type').textContent=S.pkgType;
+  document.getElementById('done-count').textContent=S.boxes.filter(b=>b.saved).length;
+  document.getElementById('done-photos').textContent=totalPhotos;
+  document.getElementById('done-user').textContent=S.user.name||S.user.username;
+  document.getElementById('done-time').textContent=new Date().toLocaleString();
+  showScreen('screen-complete');
+}
+
+// ═══════════════════════════════════════════════════
+//  SHAREPOINT
+// ═══════════════════════════════════════════════════
+async function ensureSpIds(token){
+  if(S.spSiteId&&S.spDriveId) return;
+  const siteRes=await graphGet(token,`https://graph.microsoft.com/v1.0/sites/${CFG.spSiteHost}:${CFG.spSitePath}`);
+  S.spSiteId=siteRes.id;
+  const drivesRes=await graphGet(token,`https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/drives`);
+  const drive=drivesRes.value.find(d=>d.name===CFG.photoLibrary);
+  if(!drive) throw new Error(`Library "${CFG.photoLibrary}" not found in SharePoint.`);
+  S.spDriveId=drive.id;
+}
+
+async function ensureFolder(token, folderPath){
+  // Creates folder hierarchy if it doesn't exist yet
+  const segments = folderPath.split('/');
+  let currentPath = '';
+  for(const segment of segments){
+    currentPath = currentPath ? `${currentPath}/${segment}` : segment;
+    const encodedPath = currentPath.split('/').map(encodeURIComponent).join('/');
+    const checkUrl = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/drives/${S.spDriveId}/root:/${encodedPath}`;
+    const checkRes = await fetch(checkUrl, {headers:{Authorization:`Bearer ${token}`}});
+    if(!checkRes.ok){
+      // Folder doesn't exist — create it
+      const parentPath = currentPath.includes('/')
+        ? currentPath.substring(0, currentPath.lastIndexOf('/'))
+        : '';
+      const createUrl = parentPath
+        ? `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/drives/${S.spDriveId}/root:/${parentPath.split('/').map(encodeURIComponent).join('/')}:/children`
+        : `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/drives/${S.spDriveId}/root/children`;
+      await fetch(createUrl, {
+        method:'POST',
+        headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},
+        body:JSON.stringify({name:segment, folder:{}, '@microsoft.graph.conflictBehavior':'ignore'})
+      });
+    }
+  }
+}
+
+async function spUploadFile(token,folderPath,fileName,blob){
+  // Encode each path segment separately — do NOT encode the whole path at once
+  const encodedFolder = folderPath.split('/').map(encodeURIComponent).join('/');
+  const encodedFile   = encodeURIComponent(fileName);
+  const url = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/drives/${S.spDriveId}/root:/${encodedFolder}/${encodedFile}:/content`;
+  const res = await fetch(url,{method:'PUT',headers:{Authorization:`Bearer ${token}`,'Content-Type':'image/jpeg'},body:blob});
+  if(!res.ok){
+    const e = await res.json();
+    // If folder path doesn't exist yet, create it and retry
+    if(e.error?.code==='itemNotFound'||e.error?.code==='pathNotFound'||res.status===404){
+      await ensureFolder(token, folderPath);
+      const retry = await fetch(url,{method:'PUT',headers:{Authorization:`Bearer ${token}`,'Content-Type':'image/jpeg'},body:blob});
+      if(!retry.ok){const e2=await retry.json();throw new Error(e2.error?.message||'Upload failed on retry');}
+      return (await retry.json()).webUrl;
+    }
+    throw new Error(e.error?.message||'Upload failed');
+  }
+  return (await res.json()).webUrl;
+}
+
+async function spCreateListItem(token,listName,fields){
+  const url=`https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${listName}/items`;
+  const res=await fetch(url,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({fields})});
+  if(!res.ok){const e=await res.json();throw new Error(e.error?.message||'List write failed');}
+  return await res.json();
+}
+
+async function graphGet(token,url){
+  const res=await fetch(url,{headers:{Authorization:`Bearer ${token}`}});
+  if(!res.ok){const e=await res.json();throw new Error(e.error?.message||'Graph error');}
+  return await res.json();
+}
+
+// ═══════════════════════════════════════════════════
+//  UTILITY
+// ═══════════════════════════════════════════════════
+function dataUrlToBlob(dataUrl){
+  const[h,d]=dataUrl.split(',');
+  const mime=h.match(/:(.*?);/)[1];
+  const bytes=atob(d);
+  const arr=new Uint8Array(bytes.length);
+  for(let i=0;i<bytes.length;i++)arr[i]=bytes.charCodeAt(i);
+  return new Blob([arr],{type:mime});
+}
+
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function goBack(id){ stopScanner(); stopPhotoCamera(); showScreen(id); }
+
+function resetState(){
+  stopScanner(); stopPhotoCamera();
+  S.orderNum=null; S.shipmentId=null; S.shipmentSeq=null;
+  S.boxes=[]; S.currentIdx=0;
+  S.isReopen=false; S.reopenCode=''; S.reopenNote='';
+  document.getElementById('order-input').value='';
+}
+
+function newOrder(){ resetState(); S.isReopen=false; S.reopenCode=''; S.reopenNote=''; showScreen('screen-scan'); }
+function viewSharePoint(){ window.open(`${CFG.spSiteUrl}/${CFG.photoLibrary}/${S.orderNum}`,'_blank'); }
+
+function showOverlay(msg){ document.getElementById('overlay-txt').textContent=msg||'Loading…'; document.getElementById('overlay').classList.add('show'); }
+function hideOverlay(){ document.getElementById('overlay').classList.remove('show'); }
+
+let _tt;
+function toast(msg,type=''){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.className=type?`show t-${type}`:'show';
+  clearTimeout(_tt); _tt=setTimeout(()=>el.classList.remove('show'),3200);
+}
+
+// ═══════════════════════════════════════════════════
+//  RECENT ORDERS
+// ═══════════════════════════════════════════════════
+let recentState = {
+  allOrders: [],      // raw data from SharePoint
+  filtered: [],       // after search filter
+  count: 20,          // how many to show
+  selectedOrder: null // order being reopened
+};
+
+async function showRecentOrders(){
+  // Set user badge
+  const name = S.user?.name||S.user?.username||'';
+  const initials = name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+  const av = document.getElementById('av-recent');
+  const nm = document.getElementById('nm-recent');
+  if(av) av.textContent = initials;
+  if(nm) nm.textContent = name;
+
+  showScreen('screen-recent');
+  document.getElementById('recent-search').value = '';
+  await loadRecentOrders();
+}
+
+async function loadRecentOrders(){
+  document.getElementById('recent-list').innerHTML =
+    '<div class="empty-state"><div class="empty-icon">⏳</div>Loading…</div>';
+  try{
+    const token = await getToken();
+    await ensureSpIds(token);
+
+    // Query Shipment_Packages — use id desc (sequential, no index needed)
+    // Prefer header allows non-indexed queries on smaller lists
+    const url = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listPackages}/items`+
+      `?$expand=fields($select=GP_Order_Number,Package_Type,Box_Number,Packaging_User,Created)` +
+      `&$orderby=id desc&$top=200`;
+
+    const res = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Prefer: 'HonorNonIndexedQueriesWarningMayFailRandomly'
+      }
+    });
+    if(!res.ok){ const e=await res.json(); throw new Error(e.error?.message||'Query failed'); }
+    const resJson = await res.json();
+    const items = resJson.value || [];
+
+    // Group by Shipment_ID (falls back to GP_Order_Number for old records)
+    const orderMap = {};
+    for(const item of items){
+      const f = item.fields;
+      if(!f.GP_Order_Number) continue;
+      const key = f.Shipment_ID || (f.GP_Order_Number + '-S1');
+      if(!orderMap[key]){
+        orderMap[key] = {
+          orderNum:    f.GP_Order_Number,
+          shipmentId:  key,
+          shipmentSeq: f.Shipment_Sequence || 1,
+          pkgType:     f.Package_Type || 'Box',
+          boxCount:    0,
+          packedBy:    f.Packaging_User || '—',
+          created:     f.Created || item.createdDateTime,
+          spItemIds:   []
+        };
+      }
+      orderMap[key].boxCount++;
+      orderMap[key].spItemIds.push(item.id);
+    }
+
+    // Get photo counts per order
+    const photoUrl = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listPhotos}/items`+
+      `?$expand=fields($select=GP_Order_Number,Added_After_Completion)&$top=500`;
+    const photoFetch = await fetch(photoUrl, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Prefer: 'HonorNonIndexedQueriesWarningMayFailRandomly'
+      }
+    });
+    const photoResJson = photoFetch.ok ? await photoFetch.json() : { value: [] };
+    const photos = photoResJson.value || [];
+
+    const photoCount = {};
+    const lateCount = {};
+    for(const p of photos){
+      const key = p.fields?.GP_Order_Number;
+      if(!key) continue;
+      photoCount[key] = (photoCount[key]||0) + 1;
+      if(p.fields?.Added_After_Completion) lateCount[key] = (lateCount[key]||0) + 1;
+    }
+
+    // Build final list
+    recentState.allOrders = Object.values(orderMap).map(o => ({
+      ...o,
+      photoCount: photoCount[o.orderNum] || 0,
+      latePhotoCount: lateCount[o.orderNum] || 0,
+    }));
+
+    recentState.filtered = [...recentState.allOrders];
+    renderRecentList();
+
+  }catch(e){
+    console.error('loadRecentOrders error:', e);
+    document.getElementById('recent-list').innerHTML =
+      `<div class="empty-state"><div class="empty-icon">❌</div>Failed to load: ${e.message}</div>`;
+  }
+}
+
+function filterRecentOrders(val){
+  const q = val.trim().toUpperCase();
+  if(!q){
+    recentState.filtered = [...recentState.allOrders];
+  } else {
+    recentState.filtered = recentState.allOrders.filter(o =>
+      o.orderNum.includes(q)
+    );
+  }
+  renderRecentList();
+}
+
+function setRecentCount(n){
+  recentState.count = n;
+  // Update pills
+  [10,20,50,100].forEach(v=>{
+    const el = document.getElementById('pill-'+v);
+    if(el) el.className = 'count-pill' + (v===n?' active':'');
+  });
+  renderRecentList();
+}
+
+function renderRecentList(){
+  const container = document.getElementById('recent-list');
+  const orders = recentState.filtered.slice(0, recentState.count);
+
+  if(orders.length === 0){
+    container.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div>No orders found</div>';
+    return;
+  }
+
+  container.innerHTML = '<div class="order-list">' +
+    orders.map(o => {
+      const dt = new Date(o.created);
+      const dateStr = dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+      const lateTag = o.latePhotoCount > 0
+        ? `<span style="color:var(--amber);font-size:10px;"> (+${o.latePhotoCount} added later)</span>`
+        : '';
+      // Show shipment ID suffix in red if different from plain order number
+      const sid = o.shipmentId || o.orderNum;
+      const suffix = sid !== o.orderNum
+        ? `<span style="font-family:var(--font-mono);font-size:11px;color:var(--red);margin-left:6px;">${sid}</span>`
+        : '';
+      return `
+        <div class="order-row" onclick="selectRecentOrder('${sid}')">
+          <div class="order-row-left">
+            <div class="order-row-num">${o.orderNum}${suffix}</div>
+            <div class="order-row-meta">
+              ${o.pkgType} · ${o.boxCount} package${o.boxCount!==1?'s':''} · ${o.packedBy}
+            </div>
+          </div>
+          <div class="order-row-right">
+            <div class="order-row-photos">${o.photoCount} 📷${lateTag}</div>
+            <div class="order-row-date">${dateStr}</div>
+          </div>
+          <div class="order-row-chevron">›</div>
+        </div>`;
+    }).join('') +
+  '</div>';
+}
+
+// ── REOPEN FLOW ──────────────────────────────────────────────────────────
+async function selectRecentOrder(shipmentIdOrOrderNum){
+  const order = recentState.allOrders.find(o =>
+    o.shipmentId === shipmentIdOrOrderNum || o.orderNum === shipmentIdOrOrderNum
+  );
+  if(!order){
+    toast('Order not found — try refreshing Recent Orders.', 'err');
+    return;
+  }
+  recentState.selectedOrder = order;
+
+  // Populate summary card
+  const dt = new Date(order.created);
+  const dateStr = dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  document.getElementById('detail-header-num').textContent = order.shipmentId;
+  document.getElementById('detail-order-num').textContent  = order.orderNum;
+  document.getElementById('detail-pkg-type').textContent   = order.pkgType;
+  document.getElementById('detail-box-count').textContent  = order.boxCount + ' package' + (order.boxCount!==1?'s':'');
+  document.getElementById('detail-photo-count').textContent= order.photoCount + ' photo' + (order.photoCount!==1?'s':'')
+    + (order.latePhotoCount>0 ? ` (+${order.latePhotoCount} added later)` : '');
+  document.getElementById('detail-packed-by').textContent  = order.packedBy;
+  document.getElementById('detail-date').textContent       = dateStr;
+  document.getElementById('detail-boxes').innerHTML =
+    '<div class="empty-state"><div class="empty-icon">⏳</div>Loading photos…</div>';
+
+  showScreen('screen-detail');
+
+  // Load photo detail in background
+  await loadOrderPhotoDetail(order.orderNum, order.shipmentId);
+}
+
+async function loadOrderPhotoDetail(orderNum, shipmentId){
+  try{
+    const token = await getToken();
+    await ensureSpIds(token);
+
+    // Fetch all photos for this order
+    const url = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listPhotos}/items`+
+      `?$expand=fields($select=GP_Order_Number,Shipment_ID,Box_Number,Photo_Type,Photo_Sequence,SharePoint_URL,File_Name,Captured_By,Captured_DateTime,Added_After_Completion,Reason_Code,Reason_Note)`+
+      `&$top=500`;
+    const res = await fetch(url, {
+      headers:{ Authorization:`Bearer ${token}`, Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly' }
+    });
+    if(!res.ok){ throw new Error('Failed to load photos'); }
+    const data = await res.json();
+    // Filter by shipmentId if provided, otherwise fall back to orderNum
+    const allPhotos = (data.value||[])
+      .filter(p => {
+        if(shipmentId) return p.fields?.Shipment_ID === shipmentId || p.fields?.GP_Order_Number === orderNum;
+        return p.fields?.GP_Order_Number === orderNum;
+      })
+      .map(p => p.fields)
+      .sort((a,b) => (a.Box_Number - b.Box_Number) || (a.Photo_Sequence - b.Photo_Sequence));
+
+    if(allPhotos.length === 0){
+      document.getElementById('detail-boxes').innerHTML =
+        '<div class="empty-state"><div class="empty-icon">📷</div>No photos found for this order</div>';
+      return;
+    }
+
+    // Group by box number
+    const byBox = {};
+    for(const p of allPhotos){
+      const bn = p.Box_Number || 1;
+      if(!byBox[bn]) byBox[bn] = { contents:[], final:[] };
+      if(p.Photo_Type==='Contents') byBox[bn].contents.push(p);
+      else byBox[bn].final.push(p);
+    }
+
+    const label = recentState.selectedOrder?.pkgType || 'Box';
+    const boxNums = Object.keys(byBox).sort((a,b)=>a-b);
+
+    document.getElementById('detail-boxes').innerHTML = boxNums.map(bn => {
+      const box = byBox[bn];
+      const allBoxPhotos = [...box.contents, ...box.final];
+      const totalCount = allBoxPhotos.length;
+
+      const makeThumb = (p) => {
+        const isLate = p.Added_After_Completion;
+        const spUrl  = p.SharePoint_URL || '#';
+        const label  = (p.Photo_Type||'Photo') + ' ' + (p.Photo_Sequence||'');
+        const lateTag = isLate
+          ? `<div class="late-tag" title="${p.Reason_Code||''}${p.Reason_Note?' — '+p.Reason_Note:''}">+Later</div>`
+          : '';
+        // Thumbnail <img> starts blank; loadThumbnails() fills it via Graph API.
+        // Clicking still opens the full photo in SharePoint.
+        const safeUrl = spUrl.replace(/"/g,'&quot;');
+        return `<div class="detail-thumb" onclick="window.open('${spUrl}','_blank')">
+          <img data-sp-url="${safeUrl}" loading="lazy" style="opacity:0;transition:opacity .25s;" alt=""/>
+          <div class="thumb-spinner">⏳</div>
+          ${lateTag}
+          <div class="detail-thumb-label">${label}</div>
+        </div>`;
+      };
+
+      return `<div class="box-section">
+        <div class="box-section-header">
+          <span class="box-section-title">${label} ${bn}</span>
+          <span class="box-section-count">${totalCount} photo${totalCount!==1?'s':''}</span>
+        </div>
+        <div class="box-section-body">
+          ${box.contents.length>0 ? `<div class="photo-type-label">Contents</div><div class="photo-grid">${box.contents.map(makeThumb).join('')}</div>` : ''}
+          ${box.final.length>0   ? `<div class="photo-type-label">Final / Sealed</div><div class="photo-grid">${box.final.map(makeThumb).join('')}</div>` : ''}
+          ${allBoxPhotos.length===0 ? '<div class="no-photos">No photos</div>' : ''}
+        </div>
+      </div>`;
+    }).join('<div style="height:8px;"></div>');
+
+    // Kick off async thumbnail loading — thumbs fade in as they arrive
+    loadThumbnails(token);
+
+  }catch(e){
+    console.error('loadOrderPhotoDetail error:', e);
+    document.getElementById('detail-boxes').innerHTML =
+      `<div class="empty-state"><div class="empty-icon">❌</div>${e.message}</div>`;
+  }
+}
+
+function openDetailInSharePoint(){
+  const orderNum = recentState.selectedOrder?.orderNum;
+  if(!orderNum) return;
+  window.open(`${CFG.spSiteUrl}/${CFG.photoLibrary}/Forms/AllItems.aspx`, '_blank');
+}
+
+// ═══════════════════════════════════════════════════
+//  THUMBNAIL LOADER
+//  SharePoint_URL is a web-page URL, not an image URL, so an <img src>
+//  pointed at it renders as a blank square. Instead we resolve each file
+//  via Microsoft Graph and fetch its thumbnail bytes with the bearer
+//  token, then swap those bytes in as a blob URL.
+// ═══════════════════════════════════════════════════
+const thumbCache = new Map(); // spUrl -> objectURL (session cache)
+
+async function loadThumbnails(token){
+  const imgs = Array.from(document.querySelectorAll('#detail-boxes img[data-sp-url]'));
+  if(imgs.length === 0) return;
+
+  // Serve from cache immediately, collect the rest
+  const toFetch = [];
+  for(const img of imgs){
+    const url = img.getAttribute('data-sp-url');
+    if(!url || url === '#'){ markFailed(img); continue; }
+    if(thumbCache.has(url)){
+      applyThumb(img, thumbCache.get(url));
+    } else {
+      toFetch.push(img);
+    }
+  }
+  if(toFetch.length === 0) return;
+
+  // Small concurrency pool so we don't hammer Graph
+  const CONCURRENCY = 4;
+  let idx = 0;
+  const worker = async () => {
+    while(idx < toFetch.length){
+      const img = toFetch[idx++];
+      const spUrl = img.getAttribute('data-sp-url');
+      try{
+        const blobUrl = await fetchThumbnail(token, spUrl);
+        thumbCache.set(spUrl, blobUrl);
+        applyThumb(img, blobUrl);
+      }catch(err){
+        console.warn('Thumbnail failed for', spUrl, err);
+        markFailed(img);
+      }
+    }
+  };
+  await Promise.all(Array.from({length: Math.min(CONCURRENCY, toFetch.length)}, worker));
+}
+
+function applyThumb(img, blobUrl){
+  img.src = blobUrl;
+  img.onload = () => {
+    img.style.opacity = '1';
+    img.parentElement?.classList.add('thumb-loaded');
+  };
+}
+
+function markFailed(img){
+  const wrap = img.parentElement;
+  if(wrap){
+    wrap.classList.add('thumb-failed');
+    const spinner = wrap.querySelector('.thumb-spinner');
+    if(spinner) spinner.textContent = '📷';
+  }
+}
+
+async function fetchThumbnail(token, spWebUrl){
+  // Derive the site-relative path from the webUrl.
+  // Example spWebUrl:
+  //   https://encoregrowth.sharepoint.com/sites/WarehouseShipping/ShipmentPhotos/ORDR.../Box1/foo.jpg
+  // Graph wants the path relative to the drive root, i.e. everything after
+  // the library name ("ShipmentPhotos").
+  const marker = '/' + CFG.photoLibrary + '/';
+  const i = spWebUrl.indexOf(marker);
+  if(i < 0) throw new Error('Cannot parse SharePoint URL');
+  const relativePath = spWebUrl.substring(i + marker.length);
+  // Decode any %20 etc. that came back in webUrl, then re-encode per segment
+  const decoded = decodeURIComponent(relativePath);
+  const encoded = decoded.split('/').map(encodeURIComponent).join('/');
+
+  const thumbUrl =
+    `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/drives/${S.spDriveId}` +
+    `/root:/${encoded}:/thumbnails/0/medium/content`;
+
+  const res = await fetch(thumbUrl, { headers:{ Authorization:`Bearer ${token}` } });
+  if(!res.ok) throw new Error(`Thumbnail HTTP ${res.status}`);
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
+}
+
+function startReopenFlow(){
+  const order = recentState.selectedOrder;
+  if(!order) return;
+
+  // Populate reason screen
+  document.getElementById('reason-order-num').textContent = order.orderNum;
+  const dt = new Date(order.created);
+  const dateStr = dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  document.getElementById('reason-order-meta').textContent =
+    `${order.pkgType} · ${order.boxCount} package${order.boxCount!==1?'s':''} · ${order.photoCount} photos · Packed ${dateStr} by ${order.packedBy}`;
+
+  // Reset form
+  document.getElementById('reason-code').value = '';
+  document.getElementById('reason-note').value = '';
+  document.getElementById('reason-note-wrap').style.display = 'none';
+  updateReopenBtn();
+
+  showScreen('screen-reason');
+}
+
+function checkReasonNote(){
+  const code = document.getElementById('reason-code').value;
+  document.getElementById('reason-note-wrap').style.display = code==='Other' ? 'block' : 'none';
+  if(code !== 'Other') document.getElementById('reason-note').value = '';
+  updateReopenBtn();
+}
+
+function updateReopenBtn(){
+  const code = document.getElementById('reason-code').value;
+  const note = document.getElementById('reason-note').value.trim();
+  const valid = code && (code !== 'Other' || note.length > 0);
+  const btn = document.getElementById('btn-confirm-reopen');
+  btn.disabled = !valid;
+  btn.style.opacity = valid ? '1' : '0.5';
+}
+
+// Wire up reason note input to button validation
+document.addEventListener('DOMContentLoaded', ()=>{
+  const noteInput = document.getElementById('reason-note');
+  if(noteInput) noteInput.addEventListener('input', updateReopenBtn);
+});
+
+async function confirmReopen(){
+  const order = recentState.selectedOrder;
+  if(!order) return;
+
+  const reasonCode = document.getElementById('reason-code').value;
+  const reasonNote = document.getElementById('reason-note').value.trim();
+
+  // Load existing boxes from SharePoint so we know spItemIds
+  showOverlay('Loading order data…');
+  try{
+    const token = await getToken();
+    await ensureSpIds(token);
+
+    // Fetch all boxes then filter in JS — avoids GP_Order_Number index requirement
+    const url = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listPackages}/items`+
+      `?$expand=fields($select=GP_Order_Number,Package_Type,Box_Number,Packaging_User,id)` +
+      `&$orderby=id asc&$top=500`;
+    const res = await fetch(url, {
+      headers:{
+        Authorization:`Bearer ${token}`,
+        Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly'
+      }
+    });
+    if(!res.ok){ const e=await res.json(); throw new Error(e.error?.message||'Query failed'); }
+    const resJson = await res.json();
+    // Filter to this order in JavaScript
+    const boxItems = (resJson.value||[])
+      .filter(item => item.fields?.GP_Order_Number === order.orderNum)
+      .sort((a,b) => (a.fields?.Box_Number||0) - (b.fields?.Box_Number||0));
+
+    // Build boxes array from SharePoint data
+    S.orderNum  = order.orderNum;
+    S.pkgType   = order.pkgType;
+    S.boxes     = boxItems.map(item => ({
+      contents:     [],
+      final:        [],
+      saved:        true,
+      spItemId:     item.id,
+      newContents:  [],
+      newFinal:     [],
+      // Store reopen metadata for uploads
+      reopenCode:   reasonCode,
+      reopenNote:   reasonNote,
+    }));
+    S.currentIdx = 0;
+
+    // Update photo screen labels
+    document.getElementById('photo-order-label').textContent = S.orderNum;
+    document.getElementById('photo-type-badge').textContent  = S.pkgType;
+
+    // Store reopen context in state
+    S.isReopen     = true;
+    S.reopenCode   = reasonCode;
+    S.reopenNote   = reasonNote;
+
+    hideOverlay();
+    renderPhotoScreen();
+    showScreen('screen-photos');
+
+    toast(`Re-opened ${order.orderNum} — ${reasonCode}`, 'ok');
+
+  }catch(e){
+    hideOverlay();
+    console.error('confirmReopen error:', e);
+    toast('Failed to load order: '+e.message, 'err');
+  }
+}
+
+// ── PATCH saveCurrentBox TO ADD REOPEN METADATA WHEN APPLICABLE ─────────
+const _origSaveCurrentBox = saveCurrentBox;
+// We patch the upload step inside saveCurrentBox by overriding spCreateListItem
+// for photo records — adding Added_After_Completion and Reason_Code fields
+// This is handled in the uploadPhoto function inside saveCurrentBox
+// See the patched version below which replaces saveCurrentBox entirely
+
+
+// ═══════════════════════════════════════════════════
+//  DUPLICATE ORDER DIALOG
+// ═══════════════════════════════════════════════════
+function showDupDialog(orderNum, shipments){
+  dupState.shipments = shipments;
+  dupState.selected  = null;
+  dupState.orderNum  = orderNum;
+
+  document.getElementById('dup-sub-text').textContent =
+    `"${orderNum}" has ${shipments.length} previous shipment${shipments.length!==1?'s':''}. Select one to view or add photos, or start a new shipment event.`;
+
+  // Render shipment list
+  const list = document.getElementById('dup-shipment-list');
+  list.innerHTML = shipments.map((s,i) => {
+    const dt = new Date(s.created);
+    const dateStr = dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    const photos = s.photoCount||0;
+    return `<div class="dup-shipment-row" id="dup-row-${i}" onclick="selectDupShipment(${i})">
+      <div class="dup-ship-left">
+        <div class="dup-ship-id">${s.shipmentId}</div>
+        <div class="dup-ship-meta">${s.pkgType} · ${s.boxCount} pkg${s.boxCount!==1?'s':''} · ${dateStr} · ${s.packedBy}</div>
+      </div>
+      <div class="dup-ship-photos">${photos} 📷</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('dup-selected-actions').style.display = 'none';
+  document.getElementById('dup-dialog-bg').classList.add('show');
+}
+
+function selectDupShipment(idx){
+  dupState.selected = dupState.shipments[idx];
+  // Highlight selected row
+  document.querySelectorAll('.dup-shipment-row').forEach((el,i)=>{
+    el.className = 'dup-shipment-row' + (i===idx?' selected':'');
+  });
+  document.getElementById('dup-selected-actions').style.display = 'block';
+}
+
+function closeDupDialog(){
+  document.getElementById('dup-dialog-bg').classList.remove('show');
+  dupState = { shipments:[], selected:null, orderNum:null };
+}
+
+function dupViewPrevious(){
+  if(!dupState.selected) return;
+  // Capture values BEFORE closeDupDialog() resets dupState
+  const s        = dupState.selected;
+  const orderNum = dupState.orderNum;
+  recentState.selectedOrder = {
+    orderNum:       orderNum,
+    shipmentId:     s.shipmentId,
+    pkgType:        s.pkgType,
+    boxCount:       s.boxCount,
+    photoCount:     s.photoCount||0,
+    latePhotoCount: 0,
+    packedBy:       s.packedBy,
+    created:        s.created,
+  };
+  closeDupDialog();
+  // Populate detail screen
+  const dt = new Date(s.created);
+  const dateStr = dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  document.getElementById('detail-header-num').textContent = s.shipmentId;
+  document.getElementById('detail-order-num').textContent  = orderNum;
+  document.getElementById('detail-pkg-type').textContent   = s.pkgType;
+  document.getElementById('detail-box-count').textContent  = s.boxCount + ' package' + (s.boxCount!==1?'s':'');
+  document.getElementById('detail-photo-count').textContent= (s.photoCount||0) + ' photos';
+  document.getElementById('detail-packed-by').textContent  = s.packedBy;
+  document.getElementById('detail-date').textContent       = dateStr;
+  document.getElementById('detail-boxes').innerHTML =
+    '<div class="empty-state"><div class="empty-icon">⏳</div>Loading photos…</div>';
+  showScreen('screen-detail');
+  loadOrderPhotoDetail(orderNum, s.shipmentId);
+}
+
+async function dupAddToExisting(){
+  if(!dupState.selected) return;
+  const s = dupState.selected;
+  recentState.selectedOrder = {
+    orderNum:   dupState.orderNum,
+    shipmentId: s.shipmentId,
+    pkgType:    s.pkgType,
+    boxCount:   s.boxCount,
+    photoCount: s.photoCount||0,
+    packedBy:   s.packedBy,
+    created:    s.created,
+  };
+  closeDupDialog();
+  // Go to reason screen (reopen flow)
+  startReopenFlow();
+}
+
+function dupStartNew(){
+  const maxSeq = dupState.shipments.reduce((m,s)=>Math.max(m, Number(s.seq)||1), 0);
+
+  S.orderNum    = dupState.orderNum;
+  S.shipmentSeq = maxSeq + 1;
+  S.shipmentId  = `${dupState.orderNum}-S${S.shipmentSeq}`;
+  S.isReopen    = false;
+  S.reopenCode  = '';
+  S.reopenNote  = '';
+
+  closeDupDialog();
+
+  document.getElementById('confirm-num').textContent = dupState.orderNum;
+  showScreen('screen-confirm');
+}
+
+</script>
+</body>
+</html>
