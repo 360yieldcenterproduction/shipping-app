@@ -78,9 +78,10 @@ input,select{font-family:var(--font);outline:none;}
 /* ── FORMS ── */
 .field-group{display:flex;flex-direction:column;gap:5px;}
 .field-label{font-family:var(--font-cond);font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-dim);}
-input[type="text"],select{width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:17px;font-weight:500;padding:11px 13px;transition:border-color .15s,box-shadow .15s;-webkit-appearance:none;appearance:none;}
-input[type="text"]:focus,select:focus{border-color:var(--red);box-shadow:0 0 0 3px var(--red-glow);}
-input[type="text"]::placeholder{color:var(--text-muted);font-weight:400;}
+input[type="text"],select,textarea{width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:17px;font-weight:500;padding:11px 13px;transition:border-color .15s,box-shadow .15s;-webkit-appearance:none;appearance:none;}
+input[type="text"]:focus,select:focus,textarea:focus{border-color:var(--red);box-shadow:0 0 0 3px var(--red-glow);}
+input[type="text"]::placeholder,textarea::placeholder{color:var(--text-muted);font-weight:400;}
+textarea{font-family:var(--font);resize:none;line-height:1.4;}
 select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%236D6E71' d='M6 8L0 0h12z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 13px center;padding-right:34px;cursor:pointer;}
 
 /* ── BUTTONS ── */
@@ -513,6 +514,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <div class="detail-meta-row"><span class="detail-meta-lbl">Packed By</span><span class="detail-meta-val" id="detail-packed-by">—</span></div>
       <div class="detail-meta-row"><span class="detail-meta-lbl">Started</span><span class="detail-meta-val" id="detail-started">—</span></div>
       <div class="detail-meta-row"><span class="detail-meta-lbl">Completed</span><span class="detail-meta-val" id="detail-completed">—</span></div>
+      <div class="detail-meta-row"><span class="detail-meta-lbl">Notes</span><span class="detail-meta-val" id="detail-comment">—</span></div>
     </div>
     <div id="detail-stages">
       <div class="empty-state"><div class="empty-icon">⏳</div>Loading photos…</div>
@@ -647,6 +649,13 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 
     <!-- Stage cards rendered here -->
     <div id="stage-cards"></div>
+
+    <!-- Order Notes (optional, appears after the 5 stage cards) -->
+    <div class="card">
+      <div class="card-label">Order Notes <span style="text-transform:none;font-weight:500;letter-spacing:0;color:var(--text-muted);">(optional)</span></div>
+      <textarea id="order-comment" maxlength="100" rows="2" placeholder="Add a note about this order — damage, shortage, special instructions…" oninput="updateCommentCounter()"></textarea>
+      <div style="text-align:right;font-size:11px;color:var(--text-muted);margin-top:4px;" id="comment-counter">0/100</div>
+    </div>
 
     <!-- Submit -->
     <button class="btn btn-primary" id="btn-submit" onclick="submitShipment()" disabled style="opacity:0.5;">
@@ -838,7 +847,7 @@ if(IS_TEST_ENV){
 //  MSAL
 // ═══════════════════════════════════════════════════
 let msalApp = null;
-const loginScopes = ['User.Read'];
+const loginScopes = ['User.Read','Sites.ReadWrite.All','Files.ReadWrite.All'];
 const graphScopes = ['User.Read','Sites.ReadWrite.All','Files.ReadWrite.All'];
 
 // ═══════════════════════════════════════════════════
@@ -862,6 +871,8 @@ let S = {
   spSiteId:null, spDriveId:null,
   // Reopen flow
   isReopen:false, reopenCode:'', reopenNote:'',
+  // Order-level comment (optional, set on capture screen after Audit Sheet)
+  orderComment:'',
 };
 
 let dupState = { shipments:[], selected:null, orderNum:null };
@@ -871,6 +882,12 @@ let recentState = {
   count:     20,
   selectedOrder: null,
 };
+
+function updateCommentCounter(){
+  const el = document.getElementById('order-comment');
+  const counter = document.getElementById('comment-counter');
+  if(el && counter) counter.textContent = `${el.value.length}/100`;
+}
 
 function emptyStages(){
   const out = {};
@@ -1090,6 +1107,7 @@ async function submitOrderEntry(){
     S.isReopen       = false;
     S.reopenCode     = '';
     S.reopenNote     = '';
+    S.orderComment   = '';
     S.stages         = emptyStages();
 
     document.getElementById('confirm-num').textContent = val;
@@ -1143,6 +1161,7 @@ async function fetchExistingShipments(token, orderNum){
       completed:      f.Completed_DateTime || null,
       created:        f.Created || item.createdDateTime,
       photoCount:     0,
+      comment:        f.Order_Comment || '',
     };
   });
 
@@ -1220,6 +1239,9 @@ async function startCapture(){
 
   // Reset stages for a fresh shipment (reopen path bypasses startCapture)
   S.stages = emptyStages();
+  S.orderComment = '';
+  const commentEl = document.getElementById('order-comment');
+  if(commentEl){ commentEl.value = ''; updateCommentCounter(); }
 
   // Configure capture screen
   document.getElementById('capture-order-label').textContent = S.orderNum;
@@ -1297,11 +1319,13 @@ function updateSubmitBtn(){
   const help = document.getElementById('submit-help');
 
   if(S.isReopen){
-    // Reopen: enable when there is at least one new photo to upload
-    btn.disabled = !hasNew;
-    btn.style.opacity = hasNew ? '1' : '0.5';
-    lbl.textContent = hasNew ? 'Upload New Photos & Close' : 'No New Photos Yet';
-    help.textContent = 'Add at least one photo to enable upload.';
+    // Reopen: always enabled — photos are optional, just close to mark Complete
+    btn.disabled = false;
+    btn.style.opacity = '1';
+    lbl.textContent = hasNew ? 'Upload Photos & Close' : 'Close Order';
+    help.textContent = hasNew
+      ? 'New photos will be uploaded and order marked Complete.'
+      : 'Add photos if needed, or close now to mark as Complete.';
   } else {
     // New shipment: require all 5 stages
     btn.disabled = !allStagesPresent;
@@ -1424,11 +1448,10 @@ async function submitShipment(){
     }
   }
 
-  if(S.isReopen && newPhotos.length === 0){
-    toast('No new photos to upload','err'); return;
-  }
+  const commentEl = document.getElementById('order-comment');
+  S.orderComment = (commentEl?.value || '').trim().slice(0,100);
 
-  showOverlay(`Uploading 0/${newPhotos.length}…`);
+  showOverlay(newPhotos.length > 0 ? `Uploading 0/${newPhotos.length}…` : 'Closing order…');
   try{
     const token = await getToken();
     await ensureSpIds(token);
@@ -1475,22 +1498,32 @@ async function submitShipment(){
       done++;
     }
 
-    // Mark shipment as Complete (only on first finalize; reopen leaves status alone)
-    if(!S.isReopen && S.shipmentItemId){
-      try{
-        await spPatchListItem(token, CFG.listShipments, S.shipmentItemId, {
-          Status: 'Complete',
-          Completed_DateTime: new Date().toISOString(),
-        });
-      }catch(err){
-        // Non-fatal — the shipment row exists, just status didn't flip.
-        console.warn('Could not mark shipment Complete:', err.message);
+    // Mark shipment as Complete.
+    // Runs on first finalize AND on reopen (so a stuck "In Progress" can self-heal).
+    // Retries once on failure; surfaces a visible error if both attempts fail.
+    if(S.shipmentItemId){
+      let patchOk = false;
+      for(let attempt = 0; attempt < 2 && !patchOk; attempt++){
+        if(attempt > 0) await new Promise(r => setTimeout(r, 1500));
+        try{
+          await spPatchListItem(token, CFG.listShipments, S.shipmentItemId, {
+            Status: 'Complete',
+            Completed_DateTime: new Date().toISOString(),
+            Order_Comment: S.orderComment || '',
+          });
+          patchOk = true;
+        }catch(err){
+          if(attempt === 1){
+            console.warn('Could not mark shipment Complete after retry:', err.message);
+            toast('⚠ Photos saved — but status update failed. Re-open the order to retry.', 'err');
+          }
+        }
       }
     }
 
     hideOverlay();
     if(S.isReopen){
-      toast('Photos uploaded','ok');
+      toast(newPhotos.length > 0 ? 'Photos uploaded — order marked Complete' : 'Order marked Complete','ok');
       const orderNum = S.orderNum, shipmentId = S.shipmentId;
       document.getElementById('detail-stages').innerHTML =
         '<div class="empty-state"><div class="empty-icon">⏳</div>Loading photos…</div>';
@@ -1630,7 +1663,7 @@ function resetState(){
   stopScanner(); stopPhotoCamera();
   S.orderNum=null; S.shipmentId=null; S.shipmentSeq=null; S.shipmentItemId=null;
   S.stages = {};
-  S.isReopen=false; S.reopenCode=''; S.reopenNote='';
+  S.isReopen=false; S.reopenCode=''; S.reopenNote=''; S.orderComment='';
   S.photoTargetStage=null;
   const orderInput = document.getElementById('order-input');
   if(orderInput) orderInput.value='';
@@ -1722,6 +1755,7 @@ async function loadRecentOrders(){
         created:        f.Created || item.createdDateTime,
         photoCount:     0,
         latePhotoCount: 0,
+        comment:        f.Order_Comment || '',
       };
     });
 
@@ -1834,6 +1868,7 @@ async function selectRecentOrder(shipmentIdOrOrderNum){
   document.getElementById('detail-packed-by').textContent   = order.packedBy;
   document.getElementById('detail-started').textContent     = startedStr;
   document.getElementById('detail-completed').textContent   = completedStr;
+  document.getElementById('detail-comment').textContent     = order.comment || '—';
   document.getElementById('detail-stages').innerHTML =
     '<div class="empty-state"><div class="empty-icon">⏳</div>Loading photos…</div>';
 
@@ -2109,6 +2144,7 @@ async function confirmReopen(){
     S.isReopen         = true;
     S.reopenCode       = reasonCode;
     S.reopenNote       = reasonNote;
+    S.orderComment     = order.comment || '';
     S.stages           = emptyStages();
 
     // Populate stage savedCount AND keep saved photos as placeholder
@@ -2133,6 +2169,8 @@ async function confirmReopen(){
     document.getElementById('progress-tagline').textContent    =
       `Re-opened ${S.shipmentId} — ${reasonCode}`;
     document.getElementById('capture-reopen-badge').style.display = 'inline-flex';
+    const commentEl = document.getElementById('order-comment');
+    if(commentEl){ commentEl.value = S.orderComment; updateCommentCounter(); }
 
     hideOverlay();
     renderCaptureScreen();
@@ -2352,6 +2390,7 @@ function dupViewPrevious(){
     created:         s.created,
     photoCount:      s.photoCount||0,
     latePhotoCount:  0,
+    comment:         s.comment||'',
   };
   closeDupDialog();
   const dt = new Date(s.created);
@@ -2365,6 +2404,7 @@ function dupViewPrevious(){
   document.getElementById('detail-packed-by').textContent   = s.packedBy;
   document.getElementById('detail-started').textContent     = startedStr;
   document.getElementById('detail-completed').textContent   = completedStr;
+  document.getElementById('detail-comment').textContent     = s.comment || '—';
   document.getElementById('detail-stages').innerHTML =
     '<div class="empty-state"><div class="empty-icon">⏳</div>Loading photos…</div>';
   showScreen('screen-detail');
@@ -2385,6 +2425,7 @@ async function dupAddToExisting(){
     completed:       s.completed,
     created:         s.created,
     photoCount:      s.photoCount||0,
+    comment:         s.comment||'',
   };
   closeDupDialog();
   startReopenFlow();
@@ -2400,6 +2441,7 @@ function dupStartNew(){
   S.isReopen       = false;
   S.reopenCode     = '';
   S.reopenNote     = '';
+  S.orderComment   = '';
   S.stages         = emptyStages();
 
   closeDupDialog();
