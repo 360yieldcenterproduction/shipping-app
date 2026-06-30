@@ -1781,6 +1781,7 @@ async function loadRecentOrders(){
       o.latePhotoCount = lateCount[o.shipmentId]  || 0;
     }
 
+    orders.sort((a,b) => new Date(b.started||b.created) - new Date(a.started||a.created));
     recentState.allOrders = orders;
     recentState.filtered  = [...orders];
     renderRecentList();
