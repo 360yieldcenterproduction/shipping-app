@@ -1696,12 +1696,9 @@ async function submitShippingLabel(){
     }
 
     hideOverlay();
-    toast(newPhotos.length > 0 ? 'Label uploaded — order marked Shipped' : 'Order marked Shipped', 'ok');
-    const orderNum = S.orderNum, shipmentId = S.shipmentId;
-    document.getElementById('detail-stages').innerHTML =
-      '<div class="empty-state"><div class="empty-icon">⏳</div>Loading photos…</div>';
-    showScreen('screen-detail');
-    await loadOrderPhotoDetail(orderNum, shipmentId);
+    toast(newPhotos.length > 0 ? 'Label uploaded — order marked Shipped ✓' : 'Order marked Shipped ✓', 'ok');
+    resetState();
+    showScreen('screen-scan');
 
   }catch(e){
     hideOverlay();
