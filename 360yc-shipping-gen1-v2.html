@@ -1387,16 +1387,17 @@ function updateSubmitBtn(){
   const help = document.getElementById('submit-help');
 
   if(S.isShippingLabel){
-    // Label mode: always enabled — photos are optional
     const labelSt  = S.stages['ShippingLabel'] || {photos:[], savedCount:0};
     const hasLabel = labelSt.photos.length > 0;
     const hasNewLabel = labelSt.photos.length > labelSt.savedCount;
-    btn.disabled = false;
-    btn.style.opacity = '1';
+    btn.disabled = !hasLabel;
+    btn.style.opacity = hasLabel ? '1' : '0.5';
     lbl.textContent = hasNewLabel ? 'Upload Label & Mark Shipped' : 'Mark as Shipped';
-    help.textContent = hasNewLabel
-      ? 'Label photo will be uploaded and order marked Shipped.'
-      : (hasLabel ? 'Label already on file — mark as Shipped.' : 'Add a label photo if needed, then mark as Shipped.');
+    help.textContent = !hasLabel
+      ? 'Take at least 1 label photo before marking as Shipped.'
+      : hasNewLabel
+        ? 'Label photo will be uploaded and order marked Shipped.'
+        : 'Label already on file — mark as Shipped.';
   } else if(S.isReopen){
     // Reopen: always enabled — photos are optional, just close to mark Complete
     btn.disabled = false;
@@ -1485,7 +1486,7 @@ function captureBack(){
   // the in-flight Shipments row + any uploaded photos. Warn the user.
   const hasAnyWork = STAGES.some(s => (S.stages[s.id]?.photos?.length || 0) > 0);
   if(S.isShippingLabel){
-    stopPhotoCamera();
+    resetState();
     showScreen('screen-scan');
     return;
   }
@@ -2329,6 +2330,7 @@ async function confirmReopen(){
     S.shipmentSeq      = order.shipmentSeq;
     S.shipmentItemId   = order.shipmentItemId;
     S.isReopen         = true;
+    S.isShippingLabel  = false;
     S.reopenCode       = reasonCode;
     S.reopenNote       = reasonNote;
     S.orderComment     = order.comment || '';
