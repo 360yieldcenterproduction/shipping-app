@@ -21,6 +21,7 @@
   --text:#1A1A1A; --text-dim:#5A5B5E; --text-muted:#9A9B9E;
   --green:#1B6E35; --green-lt:#E6F2EB; --green-mid:rgba(27,110,53,0.2);
   --amber:#A05C00; --amber-lt:#FEF3DC;
+  --blue:#1A56DB; --blue-lt:#EBF0FE;
   --radius:10px; --radius-sm:6px; --radius-lg:16px;
   --shadow-sm:0 1px 3px rgba(0,0,0,0.07),0 1px 2px rgba(0,0,0,0.05);
   --shadow:0 3px 12px rgba(0,0,0,0.09);
@@ -146,6 +147,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 .badge-green{background:var(--green-lt);color:var(--green);border:1px solid var(--green-mid);}
 .badge-gray{background:var(--gray-lt);color:var(--gray-dk);border:1px solid var(--gray-mid);}
 .badge-amber{background:var(--amber-lt);color:var(--amber);border:1px solid rgba(160,92,0,0.2);}
+.badge-blue{background:var(--blue-lt);color:var(--blue);border:1px solid rgba(26,86,219,0.2);}
 
 /* ── PROGRESS SUMMARY ── */
 .progress-summary{
@@ -651,7 +653,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <div id="stage-cards"></div>
 
     <!-- Order Notes (optional, appears after the 5 stage cards) -->
-    <div class="card">
+    <div class="card" id="order-notes-card">
       <div class="card-label">Order Notes <span style="text-transform:none;font-weight:500;letter-spacing:0;color:var(--text-muted);">(optional)</span></div>
       <textarea id="order-comment" maxlength="100" rows="2" placeholder="Add a note about this order — damage, shortage, special instructions…" oninput="updateCommentCounter()"></textarea>
       <div style="text-align:right;font-size:11px;color:var(--text-muted);margin-top:4px;" id="comment-counter">0/100</div>
@@ -700,8 +702,18 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 <!-- ══ DUPLICATE ORDER DIALOG ══ -->
 <div id="dup-dialog-bg">
   <div id="dup-dialog">
-    <h3>⚠️ Previous Shipment Found</h3>
+    <h3 id="dup-dialog-title">Previous Shipment Found</h3>
     <div class="dup-sub" id="dup-sub-text">This order number has been used before. Select what you'd like to do:</div>
+
+    <!-- Shipping label primary CTA — shown when most-recent shipment is Complete or Shipped -->
+    <div id="dup-label-action" style="display:none;margin-bottom:4px;">
+      <button class="btn btn-success" onclick="dupAddShippingLabel()" style="font-size:15px;gap:8px;">
+        🏷️ &nbsp;Add Shipping Label Photos
+      </button>
+      <div id="dup-label-sub" style="font-size:12px;color:var(--text-muted);text-align:center;margin-top:6px;line-height:1.4;"></div>
+    </div>
+    <div class="dup-divider" id="dup-label-divider" style="display:none;"><span>or</span></div>
+
     <div class="dup-shipment-list" id="dup-shipment-list"></div>
     <div id="dup-selected-actions" style="display:none;">
       <div class="dup-action-label">With selected shipment:</div>
@@ -710,7 +722,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
           👁 &nbsp;View This Shipment (read-only)
         </button>
         <button class="btn btn-outline" onclick="dupAddToExisting()" style="font-size:14px;border-color:var(--amber);color:var(--amber);">
-          ✏️ &nbsp;Add Photos to This Shipment
+          ✏️ &nbsp;Re-open for Packing Photos
         </button>
       </div>
     </div>
@@ -835,6 +847,11 @@ const STAGES = [
    help:'One photo per page — add multiple if the audit sheet has more than one page.'},
 ];
 
+const LABEL_STAGE = {
+  id:'ShippingLabel', label:'Shipping Label', icon:'🏷️',
+  help:'Photo of the shipping label affixed to the package — taken at the dock before loading on the truck.',
+};
+
 if(IS_TEST_ENV){
   console.log('%c🧪 TEST ENVIRONMENT — using *_TEST lists',
     'background:#f59e0b;color:#000;font-weight:900;padding:4px 10px;font-size:13px;border-radius:4px;');
@@ -871,11 +888,13 @@ let S = {
   spSiteId:null, spDriveId:null,
   // Reopen flow
   isReopen:false, reopenCode:'', reopenNote:'',
+  // Shipping label flow
+  isShippingLabel:false,
   // Order-level comment (optional, set on capture screen after Audit Sheet)
   orderComment:'',
 };
 
-let dupState = { shipments:[], selected:null, orderNum:null };
+let dupState = { shipments:[], selected:null, orderNum:null, labelTarget:null };
 let recentState = {
   allOrders: [],
   filtered:  [],
@@ -1104,11 +1123,12 @@ async function submitOrderEntry(){
     S.shipmentSeq    = 1;
     S.shipmentId     = `${val}-S1`;
     S.shipmentItemId = null;
-    S.isReopen       = false;
-    S.reopenCode     = '';
-    S.reopenNote     = '';
-    S.orderComment   = '';
-    S.stages         = emptyStages();
+    S.isReopen         = false;
+    S.reopenCode       = '';
+    S.reopenNote       = '';
+    S.orderComment     = '';
+    S.isShippingLabel  = false;
+    S.stages           = emptyStages();
 
     document.getElementById('confirm-num').textContent = val;
     showScreen('screen-confirm');
@@ -1255,15 +1275,63 @@ async function startCapture(){
 }
 
 function renderCaptureScreen(){
+  const pipsEl  = document.getElementById('progress-pips');
+  const cardsEl = document.getElementById('stage-cards');
+
+  const notesCard = document.getElementById('order-notes-card');
+
+  // ── SHIPPING LABEL MODE: one card, one pip ──────────────
+  if(S.isShippingLabel){
+    if(notesCard) notesCard.style.display = 'none';
+    const st    = S.stages['ShippingLabel'] || {photos:[], savedCount:0};
+    const count = st.photos.length;
+    const hasClass = count > 0 ? ' has-photos' : '';
+    const grid = count === 0 ? '' : `<div class="photo-grid">
+      ${st.photos.map((src,i) => {
+        const isSaved = i < st.savedCount;
+        const rmBtn = isSaved
+          ? `<button class="thumb-rm" disabled title="Already saved">✓</button>`
+          : `<button class="thumb-rm" onclick="removeStagePhoto('ShippingLabel',${i})">✕</button>`;
+        return `<div class="photo-thumb">
+          <img src="${src}" loading="lazy"/>
+          ${rmBtn}
+          <div class="thumb-label">Label ${i+1}${isSaved?' ✓':''}</div>
+        </div>`;
+      }).join('')}
+    </div>`;
+    pipsEl.innerHTML  = `<div class="progress-pip${count>0?' done':''}" title="Shipping Label">🏷</div>`;
+    cardsEl.innerHTML = `<div class="stage-card${hasClass}" id="stage-card-ShippingLabel">
+      <div class="stage-card-header">
+        <div>
+          <span class="stage-card-num">1.</span>
+          <span class="stage-card-title">${LABEL_STAGE.icon} &nbsp;${LABEL_STAGE.label}</span>
+        </div>
+        <div class="stage-card-status">
+          <span class="stage-card-count">${count} photo${count!==1?'s':''}</span>
+        </div>
+      </div>
+      <div class="stage-card-body">
+        <div class="stage-help">${LABEL_STAGE.help}</div>
+        ${grid}
+        <button class="btn btn-outline btn-sm" onclick="openPhotoCamera('ShippingLabel')" style="width:100%;">
+          📷 &nbsp;Add Label Photo
+        </button>
+      </div>
+    </div>`;
+    updateSubmitBtn();
+    return;
+  }
+
+  // ── NORMAL 5-STAGE MODE ────────────────────────────────
+  if(notesCard) notesCard.style.display = '';
+
   // Progress pips
-  const pipsEl = document.getElementById('progress-pips');
   pipsEl.innerHTML = STAGES.map((stage,i) => {
     const has = (S.stages[stage.id]?.photos?.length || 0) > 0;
     return `<div class="progress-pip${has?' done':''}" title="${stage.label}">${has?'':(i+1)}</div>`;
   }).join('');
 
   // Stage cards
-  const cardsEl = document.getElementById('stage-cards');
   cardsEl.innerHTML = STAGES.map(stage => {
     const st = S.stages[stage.id] || {photos:[], savedCount:0};
     const count = st.photos.length;
@@ -1318,7 +1386,18 @@ function updateSubmitBtn(){
   const lbl = document.getElementById('btn-submit-label');
   const help = document.getElementById('submit-help');
 
-  if(S.isReopen){
+  if(S.isShippingLabel){
+    // Label mode: always enabled — photos are optional
+    const labelSt  = S.stages['ShippingLabel'] || {photos:[], savedCount:0};
+    const hasLabel = labelSt.photos.length > 0;
+    const hasNewLabel = labelSt.photos.length > labelSt.savedCount;
+    btn.disabled = false;
+    btn.style.opacity = '1';
+    lbl.textContent = hasNewLabel ? 'Upload Label & Mark Shipped' : 'Mark as Shipped';
+    help.textContent = hasNewLabel
+      ? 'Label photo will be uploaded and order marked Shipped.'
+      : (hasLabel ? 'Label already on file — mark as Shipped.' : 'Add a label photo if needed, then mark as Shipped.');
+  } else if(S.isReopen){
     // Reopen: always enabled — photos are optional, just close to mark Complete
     btn.disabled = false;
     btn.style.opacity = '1';
@@ -1345,7 +1424,7 @@ function updateSubmitBtn(){
 // ═══════════════════════════════════════════════════
 async function openPhotoCamera(stageId){
   S.photoTargetStage = stageId;
-  const stage = STAGES.find(s => s.id === stageId);
+  const stage = STAGES.find(s => s.id === stageId) || (stageId === 'ShippingLabel' ? LABEL_STAGE : null);
   document.getElementById('cam-stage-label').textContent = stage ? stage.label : 'Photo';
   const camWrap = document.getElementById('photo-cam-wrap');
   camWrap.style.display='block';
@@ -1405,6 +1484,11 @@ function captureBack(){
   // For a brand-new shipment in progress, going back means abandoning
   // the in-flight Shipments row + any uploaded photos. Warn the user.
   const hasAnyWork = STAGES.some(s => (S.stages[s.id]?.photos?.length || 0) > 0);
+  if(S.isShippingLabel){
+    stopPhotoCamera();
+    showScreen('screen-scan');
+    return;
+  }
   if(S.isReopen){
     showScreen('screen-detail');
     return;
@@ -1433,6 +1517,8 @@ function captureBack(){
 //  SUBMIT — uploads any new photos and finalizes shipment
 // ═══════════════════════════════════════════════════
 async function submitShipment(){
+  if(S.isShippingLabel){ await submitShippingLabel(); return; }
+
   // Validation
   const allStagesPresent = STAGES.every(s => (S.stages[s.id]?.photos?.length || 0) > 0);
   if(!S.isReopen && !allStagesPresent){
@@ -1537,6 +1623,90 @@ async function submitShipment(){
     hideOverlay();
     console.error('Submit failed:', e);
     toast('Upload failed: '+e.message,'err');
+  }
+}
+
+async function submitShippingLabel(){
+  const st = S.stages['ShippingLabel'] || {photos:[], savedCount:0, savedUrls:[]};
+  const newPhotos = [];
+  for(let i = st.savedCount; i < st.photos.length; i++){
+    newPhotos.push({dataUrl: st.photos[i], sequence: i+1});
+  }
+
+  showOverlay(newPhotos.length > 0 ? `Uploading 0/${newPhotos.length}…` : 'Marking as Shipped…');
+  try{
+    const token = await getToken();
+    await ensureSpIds(token);
+    const userName  = S.user?.name || S.user?.username || '';
+    const userEmail = S.user?.username || S.user?.name  || '';
+    const now = new Date().toISOString();
+
+    let done = 0;
+    for(const p of newPhotos){
+      showOverlay(`Uploading ${done+1}/${newPhotos.length} (Label)…`);
+      const blob = dataUrlToBlob(p.dataUrl);
+      const fileName = `${S.shipmentId}_ShippingLabel_${p.sequence}_${Date.now()}.jpg`;
+      const folderPath = `${S.orderNum}/${S.shipmentId}/ShippingLabel`;
+      const spUrl = await spUploadFile(token, folderPath, fileName, blob);
+
+      const fields = {
+        Title:                  fileName,
+        GP_Order_Number:        S.orderNum,
+        Shipment_ID:            S.shipmentId,
+        Stage:                  'ShippingLabel',
+        Photo_Sequence:         p.sequence,
+        SharePoint_URL:         spUrl,
+        File_Name:              fileName,
+        Captured_By:            userName,
+        Captured_Email:         userEmail,
+        Captured_DateTime:      now,
+        Added_After_Completion: true,
+        Reason_Code:            'ShippingLabel',
+        Reason_Note:            '',
+        Is_Deleted:             false,
+      };
+      try{
+        await spCreateListItem(token, CFG.listPhotos, fields);
+      }catch(err){
+        console.error('Label photo list-item create failed:', err.message);
+        throw new Error(`Label #${p.sequence}: ${err.message}`);
+      }
+      st.savedCount = Math.max(st.savedCount, p.sequence);
+      done++;
+    }
+
+    // Patch status to Shipped
+    if(S.shipmentItemId){
+      let patchOk = false;
+      for(let attempt = 0; attempt < 2 && !patchOk; attempt++){
+        if(attempt > 0) await new Promise(r => setTimeout(r, 1500));
+        try{
+          await spPatchListItem(token, CFG.listShipments, S.shipmentItemId, {
+            Status: 'Shipped',
+            Shipped_DateTime: now,
+          });
+          patchOk = true;
+        }catch(err){
+          if(attempt === 1){
+            console.warn('Could not mark Shipped after retry:', err.message);
+            toast('⚠ Photos saved — status update failed. Re-open to retry.', 'err');
+          }
+        }
+      }
+    }
+
+    hideOverlay();
+    toast(newPhotos.length > 0 ? 'Label uploaded — order marked Shipped' : 'Order marked Shipped', 'ok');
+    const orderNum = S.orderNum, shipmentId = S.shipmentId;
+    document.getElementById('detail-stages').innerHTML =
+      '<div class="empty-state"><div class="empty-icon">⏳</div>Loading photos…</div>';
+    showScreen('screen-detail');
+    await loadOrderPhotoDetail(orderNum, shipmentId);
+
+  }catch(e){
+    hideOverlay();
+    console.error('Label submit failed:', e);
+    toast('Upload failed: '+e.message, 'err');
   }
 }
 
@@ -1663,7 +1833,7 @@ function resetState(){
   stopScanner(); stopPhotoCamera();
   S.orderNum=null; S.shipmentId=null; S.shipmentSeq=null; S.shipmentItemId=null;
   S.stages = {};
-  S.isReopen=false; S.reopenCode=''; S.reopenNote=''; S.orderComment='';
+  S.isReopen=false; S.reopenCode=''; S.reopenNote=''; S.orderComment=''; S.isShippingLabel=false;
   S.photoTargetStage=null;
   const orderInput = document.getElementById('order-input');
   if(orderInput) orderInput.value='';
@@ -1827,9 +1997,11 @@ function renderRecentList(){
       const suffix = sid !== o.orderNum
         ? `<span style="font-family:var(--font-mono);font-size:11px;color:var(--red);margin-left:6px;">${sid.replace(o.orderNum,'').replace(/^-/,'')}</span>`
         : '';
-      const statusBadge = o.status === 'Complete'
-        ? '<span class="badge badge-green" style="margin-left:6px;">✓</span>'
-        : '<span class="badge badge-amber" style="margin-left:6px;">In Progress</span>';
+      const statusBadge = o.status === 'Shipped'
+        ? '<span class="badge badge-blue" style="margin-left:6px;">🚚 Shipped</span>'
+        : o.status === 'Complete'
+          ? '<span class="badge badge-green" style="margin-left:6px;">✓</span>'
+          : '<span class="badge badge-amber" style="margin-left:6px;">In Progress</span>';
       return `
         <div class="order-row" onclick="selectRecentOrder('${sid}')">
           <div class="order-row-left">
@@ -1931,7 +2103,7 @@ async function loadOrderPhotoDetail(orderNum, shipmentId){
     const makeThumb = (p) => {
       const isLate = p.Added_After_Completion;
       const spUrl  = p.SharePoint_URL || '#';
-      const stageDef = STAGES.find(s => s.id === p.Stage);
+      const stageDef = STAGES.find(s => s.id === p.Stage) || (p.Stage === 'ShippingLabel' ? LABEL_STAGE : null);
       const lbl = (stageDef ? stageDef.label.split(' ')[0] : (p.Stage||'Photo')) + ' ' + (p.Photo_Sequence||'');
       const lateTag = isLate
         ? `<div class="late-tag" title="${p.Reason_Code||''}${p.Reason_Note?' — '+p.Reason_Note:''}">+Later</div>`
@@ -1961,8 +2133,25 @@ async function loadOrderPhotoDetail(orderNum, shipmentId){
       </div>`;
     }).join('<div style="height:8px;"></div>');
 
-    // Surface any photos with unexpected Stage values (data drift / older rows)
-    const unknownPhotos = allPhotos.filter(p => !STAGES.some(s => s.id === p.Stage));
+    // Shipping Label section (separate from the 5 packing stages)
+    const labelPhotos = allPhotos.filter(p => p.Stage === 'ShippingLabel');
+    if(labelPhotos.length > 0){
+      const lc = labelPhotos.length;
+      html += '<div style="height:8px;"></div>';
+      html += `<div class="box-section">
+        <div class="box-section-header">
+          <span class="box-section-title">${LABEL_STAGE.icon} &nbsp;${LABEL_STAGE.label}</span>
+          <span class="box-section-count">${lc} photo${lc!==1?'s':''}</span>
+        </div>
+        <div class="box-section-body">
+          <div class="photo-grid">${labelPhotos.map(makeThumb).join('')}</div>
+        </div>
+      </div>`;
+    }
+
+    // Surface any truly unexpected Stage values (data drift / older rows)
+    const knownIds = new Set([...STAGES.map(s => s.id), 'ShippingLabel']);
+    const unknownPhotos = allPhotos.filter(p => !knownIds.has(p.Stage));
     if(unknownPhotos.length > 0){
       html += '<div style="height:8px;"></div>';
       html += `<div class="box-section">
@@ -2337,12 +2526,34 @@ async function confirmDeleteShipment(){
 //  DUPLICATE ORDER DIALOG
 // ═══════════════════════════════════════════════════
 function showDupDialog(orderNum, shipments){
-  dupState.shipments = shipments;
-  dupState.selected  = null;
-  dupState.orderNum  = orderNum;
+  dupState.shipments   = shipments;
+  dupState.selected    = null;
+  dupState.orderNum    = orderNum;
+  dupState.labelTarget = null;
 
-  document.getElementById('dup-sub-text').textContent =
-    `"${orderNum}" has ${shipments.length} previous shipment${shipments.length!==1?'s':''}. Select one to view or add photos, or start a new shipment event.`;
+  // Show label CTA when the most-recent shipment is Complete or Shipped
+  const latest        = shipments[0];
+  const showLabelCTA  = latest && (latest.status === 'Complete' || latest.status === 'Shipped');
+  const labelDiv      = document.getElementById('dup-label-action');
+  const labelDivider  = document.getElementById('dup-label-divider');
+
+  if(showLabelCTA){
+    dupState.labelTarget = latest;
+    const dt      = new Date(latest.started || latest.created);
+    const dateStr = dt.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    const alreadyShipped = latest.status === 'Shipped';
+    document.getElementById('dup-label-sub').textContent =
+      `${latest.shipmentId} · ${alreadyShipped ? 'Already shipped' : 'Packing complete'} · ${dateStr} · ${latest.packedBy}`;
+    labelDiv.style.display     = 'block';
+    labelDivider.style.display = 'block';
+    document.getElementById('dup-sub-text').textContent =
+      `"${orderNum}" — packing is complete. Add shipping label photos, or choose another action below.`;
+  } else {
+    labelDiv.style.display     = 'none';
+    labelDivider.style.display = 'none';
+    document.getElementById('dup-sub-text').textContent =
+      `"${orderNum}" has ${shipments.length} previous shipment${shipments.length!==1?'s':''}. Select one to view or add photos, or start a new shipment event.`;
+  }
 
   const list = document.getElementById('dup-shipment-list');
   list.innerHTML = shipments.map((s,i) => {
@@ -2372,7 +2583,74 @@ function selectDupShipment(idx){
 
 function closeDupDialog(){
   document.getElementById('dup-dialog-bg').classList.remove('show');
-  dupState = { shipments:[], selected:null, orderNum:null };
+  dupState = { shipments:[], selected:null, orderNum:null, labelTarget:null };
+}
+
+async function dupAddShippingLabel(){
+  const s = dupState.labelTarget || dupState.shipments[0];
+  if(!s) return;
+  closeDupDialog();
+
+  showOverlay('Loading shipment…');
+  try{
+    const token = await getToken();
+    await ensureSpIds(token);
+
+    // Fetch any existing ShippingLabel photos for this shipment
+    const filterExpr = `fields/Shipment_ID eq '${s.shipmentId.replace(/'/g,"''")}'`;
+    const url = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listPhotos}/items`+
+      `?$expand=fields&$filter=${encodeURIComponent(filterExpr)}&$top=500`;
+    let res = await fetch(url,{headers:{Authorization:`Bearer ${token}`,Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly'}});
+    let data;
+    if(res.ok){ data = await res.json(); }
+    else{
+      const fb = await fetch(
+        `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listPhotos}/items?$expand=fields&$top=500`,
+        {headers:{Authorization:`Bearer ${token}`,Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly'}}
+      );
+      if(!fb.ok) throw new Error('Could not load existing photos');
+      data = await fb.json();
+    }
+    const existingLabel = (data.value||[])
+      .filter(p => p.fields?.Is_Deleted !== true && p.fields?.Shipment_ID === s.shipmentId && p.fields?.Stage === 'ShippingLabel')
+      .sort((a,b) => (a.fields?.Photo_Sequence||0) - (b.fields?.Photo_Sequence||0));
+
+    // Set up state
+    S.orderNum        = dupState.orderNum || s.shipmentId.split('-S')[0];
+    S.shipmentId      = s.shipmentId;
+    S.shipmentSeq     = s.seq;
+    S.shipmentItemId  = s.shipmentItemId;
+    S.isShippingLabel = true;
+    S.isReopen        = false;
+    S.reopenCode      = '';
+    S.reopenNote      = '';
+    S.orderComment    = s.comment || '';
+    S.stages          = {};
+    S.stages['ShippingLabel'] = {
+      photos:     existingLabel.map(p => p.fields?.SharePoint_URL || ''),
+      savedCount: existingLabel.length,
+      savedUrls:  existingLabel.map(p => p.fields?.SharePoint_URL || ''),
+    };
+
+    // Configure capture screen header
+    document.getElementById('capture-order-label').textContent = S.orderNum;
+    document.getElementById('progress-order-num').textContent  = S.orderNum;
+    document.getElementById('progress-tagline').textContent    = `${S.shipmentId} — shipping label photo`;
+    const badge = document.getElementById('capture-reopen-badge');
+    badge.textContent    = '🏷️ Label';
+    badge.style.display  = 'inline-flex';
+
+    const commentEl = document.getElementById('order-comment');
+    if(commentEl){ commentEl.value = S.orderComment; updateCommentCounter(); }
+
+    hideOverlay();
+    renderCaptureScreen();
+    showScreen('screen-capture');
+
+  }catch(e){
+    hideOverlay();
+    toast('Failed to load shipment: '+e.message,'err');
+  }
 }
 
 function dupViewPrevious(){
@@ -2439,11 +2717,12 @@ function dupStartNew(){
   S.shipmentSeq    = maxSeq + 1;
   S.shipmentId     = `${dupState.orderNum}-S${S.shipmentSeq}`;
   S.shipmentItemId = null;
-  S.isReopen       = false;
-  S.reopenCode     = '';
-  S.reopenNote     = '';
-  S.orderComment   = '';
-  S.stages         = emptyStages();
+  S.isReopen        = false;
+  S.reopenCode      = '';
+  S.reopenNote      = '';
+  S.orderComment    = '';
+  S.isShippingLabel = false;
+  S.stages          = emptyStages();
 
   closeDupDialog();
   document.getElementById('confirm-num').textContent = dupState.orderNum;
