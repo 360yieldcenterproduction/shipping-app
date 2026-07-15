@@ -140,6 +140,19 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 .stage-card.has-photos .stage-card-count{color:var(--green);}
 .stage-card-body{padding:0 14px 14px;}
 .stage-help{font-size:12px;color:var(--text-muted);line-height:1.5;margin-bottom:10px;}
+.stage-card.is-na .stage-card-header{border-left-color:var(--text-muted);opacity:0.55;}
+.stage-card.is-na .stage-card-body{opacity:0.55;}
+.btn-na{
+  width:100%;padding:7px;border:1px dashed var(--border);border-radius:var(--radius-sm);
+  background:transparent;color:var(--text-muted);font-size:12px;font-weight:600;
+  cursor:pointer;margin-top:6px;letter-spacing:0.02em;
+}
+.btn-na:hover{border-color:var(--text-muted);color:var(--text);}
+.btn-na.active{background:var(--gray-mid);color:var(--text);border-style:solid;}
+.section-header-l{
+  font-family:var(--font-cond);font-size:10px;font-weight:900;letter-spacing:0.08em;
+  text-transform:uppercase;color:var(--text-muted);padding:4px 0 8px;
+}
 
 /* ── BADGES ── */
 .badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-family:var(--font-cond);font-size:10px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;}
@@ -588,12 +601,12 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   </div>
   <div class="screen-body">
     <div class="confirm-hero">
-      <div class="confirm-hero-sub">GP Order Number</div>
+      <div class="confirm-hero-sub" id="confirm-hero-sub">GP Order Number</div>
       <div class="confirm-hero-num" id="confirm-num">—</div>
     </div>
     <div class="card">
       <div class="card-label">Verify before continuing</div>
-      <p style="font-size:13px;color:var(--text-dim);line-height:1.6;margin-bottom:13px;">Confirm this order number matches your picking ticket. All photos will be filed under this number.</p>
+      <p id="confirm-help-text" style="font-size:13px;color:var(--text-dim);line-height:1.6;margin-bottom:13px;">Confirm this order number matches your picking ticket. All photos will be filed under this number.</p>
       <div class="btn-row">
         <button class="btn btn-outline" onclick="goBack('screen-scan')" style="flex:1;">← Re-scan</button>
         <button class="btn btn-primary" onclick="startCapture()" style="flex:2;">Confirm & Continue →</button>
@@ -835,15 +848,15 @@ const CFG = {
 // Used for: choice values in SharePoint, folder names, UI labels.
 // Order here drives display order and progress pips.
 const STAGES = [
-  {id:'Cart',          label:'Cart Photos',     icon:'🛒',
+  {id:'Cart',          label:'Cart Photos',     icon:'🛒', canSkip:true,
    help:'Photos of all order components gathered on your cart or table — before they go into boxes.'},
-  {id:'OpenBoxes',     label:'Open Boxes',      icon:'📦',
+  {id:'OpenBoxes',     label:'Open Boxes',      icon:'📦', canSkip:true,
    help:'Photos of components placed in their boxes/pallets, before sealing.'},
-  {id:'WrappedReady',  label:'Wrapped & Ready', icon:'🚚',
+  {id:'WrappedReady',  label:'Wrapped & Ready', icon:'🚚', canSkip:false,
    help:'Final photos of sealed/wrapped boxes or pallets ready for the dock.'},
-  {id:'PickingTicket', label:'Picking Ticket',  icon:'📋',
+  {id:'PickingTicket', label:'Picking Ticket',  icon:'📋', canSkip:false,
    help:'One photo per page — add multiple if the picking ticket has more than one page.'},
-  {id:'AuditSheet',    label:'Audit Sheet',     icon:'📝',
+  {id:'AuditSheet',    label:'Audit Sheet',     icon:'📝', canSkip:false,
    help:'One photo per page — add multiple if the audit sheet has more than one page.'},
 ];
 
@@ -851,6 +864,26 @@ const LABEL_STAGE = {
   id:'ShippingLabel', label:'Shipping Label', icon:'🏷️',
   help:'Photo of the shipping label affixed to the package — taken at the dock before loading on the truck.',
 };
+
+// ── CONTROL PANEL / SKID WORKFLOW (triggered by "-L" order suffix) ──────────
+const STAGES_L = [
+  {id:'InsidePanel',   label:'Inside Panel',            icon:'🔧', canSkip:true,
+   help:'Photo of the inside of the panel — skip if not applicable for this unit.'},
+  {id:'PumpSide',      label:'Pump Side',               icon:'🔧', canSkip:true,
+   help:'Photo of the pump side of the panel — skip if not applicable.'},
+  {id:'SupplySide',    label:'Supply Side',             icon:'🔧', canSkip:true,
+   help:'Photo of the supply side of the panel — skip if not applicable.'},
+  {id:'PanelInterior', label:'Panel Interior Close Ups',icon:'🔍', canSkip:false,
+   help:'Close-up photos of the panel interior components.'},
+  {id:'WrappedReady',  label:'Wrapped & Ready',         icon:'📦', canSkip:false,
+   help:'Final photos of the unit wrapped and ready for the dock.'},
+  {id:'WorkOrder',     label:'Work Order',              icon:'📋', canSkip:false,
+   help:'Photo of the Google Sheet work order document for this unit.'},
+  {id:'PickingTicket', label:'GP Picking Ticket',       icon:'🎫', canSkip:false,
+   help:'One photo per page of the GP picking ticket.'},
+  {id:'AuditSheet',    label:'Audit Sheet',             icon:'📝', canSkip:false,
+   help:'One photo per page of the completed audit sheet.'},
+];
 
 if(IS_TEST_ENV){
   console.log('%c🧪 TEST ENVIRONMENT — using *_TEST lists',
@@ -875,12 +908,13 @@ const graphScopes = ['User.Read','Sites.ReadWrite.All','Files.ReadWrite.All'];
 // ═══════════════════════════════════════════════════
 let S = {
   user:null, token:null,
-  orderNum:null,
+  orderNum:null,          // full order number stored in SharePoint (may include -L)
+  displayOrderNum:null,   // order number shown in UI (L suffix stripped)
   shipmentId:null,        // e.g. ORDR00050014-S1
   shipmentSeq:null,
   shipmentItemId:null,    // SharePoint list item ID for the Shipments row
   // stages keyed by stage.id
-  // each: { photos:[dataUrl], savedCount:int, savedUrls:[spWebUrl|null] }
+  // each: { photos:[dataUrl], savedCount:int, savedUrls:[spWebUrl|null], na:bool }
   stages: {},
   // Camera state
   scanStream:null, photoStream:null, photoTargetStage:null,
@@ -890,6 +924,8 @@ let S = {
   isReopen:false, reopenCode:'', reopenNote:'',
   // Shipping label flow
   isShippingLabel:false,
+  // Control Panel / Skid workflow (order number ends with -L)
+  isLWorkflow:false,
   // Order-level comment (optional, set on capture screen after Audit Sheet)
   orderComment:'',
 };
@@ -908,10 +944,13 @@ function updateCommentCounter(){
   if(el && counter) counter.textContent = `${el.value.length}/100`;
 }
 
-function emptyStages(){
+function activeStages(){ return S.isLWorkflow ? STAGES_L : STAGES; }
+
+function emptyStages(stagesArr){
+  const arr = stagesArr || activeStages();
   const out = {};
-  for(const s of STAGES){
-    out[s.id] = { photos:[], savedCount:0, savedUrls:[] };
+  for(const s of arr){
+    out[s.id] = { photos:[], savedCount:0, savedUrls:[], na:false };
   }
   return out;
 }
@@ -1105,7 +1144,10 @@ async function submitOrderEntry(){
   const val = document.getElementById('order-input').value.trim().toUpperCase();
   if(!val){ toast('Please enter or scan an order number','err'); return; }
 
-  S.orderNum = val;
+  const isL = val.endsWith('-L');
+  S.orderNum        = val;
+  S.displayOrderNum = isL ? val.slice(0, -2) : val;
+  S.isLWorkflow     = isL;
 
   showOverlay('Checking order…');
   try{
@@ -1130,7 +1172,13 @@ async function submitOrderEntry(){
     S.isShippingLabel  = false;
     S.stages           = emptyStages();
 
-    document.getElementById('confirm-num').textContent = val;
+    document.getElementById('confirm-num').textContent = S.displayOrderNum;
+    document.getElementById('confirm-hero-sub').textContent =
+      isL ? 'Work Order Number' : 'GP Order Number';
+    document.getElementById('confirm-help-text').textContent =
+      isL
+        ? 'Confirm this order number matches your Google Sheet work order. All photos will be filed under this number.'
+        : 'Confirm this order number matches your picking ticket. All photos will be filed under this number.';
     showScreen('screen-confirm');
   }catch(e){
     hideOverlay();
@@ -1264,8 +1312,8 @@ async function startCapture(){
   if(commentEl){ commentEl.value = ''; updateCommentCounter(); }
 
   // Configure capture screen
-  document.getElementById('capture-order-label').textContent = S.orderNum;
-  document.getElementById('progress-order-num').textContent  = S.orderNum;
+  document.getElementById('capture-order-label').textContent = S.displayOrderNum || S.orderNum;
+  document.getElementById('progress-order-num').textContent  = S.displayOrderNum || S.orderNum;
   document.getElementById('progress-tagline').textContent    =
     `${S.shipmentId} · capture each stage in any order`;
   document.getElementById('capture-reopen-badge').style.display = 'none';
@@ -1322,20 +1370,25 @@ function renderCaptureScreen(){
     return;
   }
 
-  // ── NORMAL 5-STAGE MODE ────────────────────────────────
+  // ── NORMAL / L-WORKFLOW STAGE MODE ────────────────────────────────
   if(notesCard) notesCard.style.display = '';
 
-  // Progress pips
-  pipsEl.innerHTML = STAGES.map((stage,i) => {
-    const has = (S.stages[stage.id]?.photos?.length || 0) > 0;
-    return `<div class="progress-pip${has?' done':''}" title="${stage.label}">${has?'':(i+1)}</div>`;
+  const stages = activeStages();
+
+  // Progress pips — done if has photos OR marked N/A
+  pipsEl.innerHTML = stages.map((stage,i) => {
+    const st  = S.stages[stage.id];
+    const done = (st?.photos?.length || 0) > 0 || st?.na === true;
+    return `<div class="progress-pip${done?' done':''}" title="${stage.label}">${done?'':(i+1)}</div>`;
   }).join('');
 
   // Stage cards
-  cardsEl.innerHTML = STAGES.map(stage => {
-    const st = S.stages[stage.id] || {photos:[], savedCount:0};
-    const count = st.photos.length;
-    const hasClass = count > 0 ? ' has-photos' : '';
+  cardsEl.innerHTML = stages.map((stage, idx) => {
+    const st      = S.stages[stage.id] || {photos:[], savedCount:0, na:false};
+    const count   = st.photos.length;
+    const isNA    = st.na === true;
+    const hasClass= count > 0 ? ' has-photos' : (isNA ? ' is-na' : '');
+
     const grid = count === 0 ? '' : `
       <div class="photo-grid">
         ${st.photos.map((src,i)=>{
@@ -1350,22 +1403,38 @@ function renderCaptureScreen(){
           </div>`;
         }).join('')}
       </div>`;
+
+    const naBtn = stage.canSkip
+      ? `<button class="btn-na${isNA?' active':''}" onclick="toggleStageNA('${stage.id}')">
+           ${isNA ? '↩ Undo N/A' : 'Mark as N/A'}
+         </button>`
+      : '';
+
+    const photoBtn = isNA
+      ? ''
+      : `<button class="btn btn-outline btn-sm" onclick="openPhotoCamera('${stage.id}')" style="width:100%;margin-top:${count>0?'6px':'0'};">
+           📷 &nbsp;Add ${stage.label.split(' ')[0]} Photo
+         </button>`;
+
+    const naLabel = isNA
+      ? `<div style="font-size:12px;color:var(--text-muted);font-style:italic;padding:4px 0 6px;">
+           Marked as N/A — no photo required for this stage.
+         </div>`
+      : '';
+
     return `<div class="stage-card${hasClass}" id="stage-card-${stage.id}">
       <div class="stage-card-header">
         <div>
-          <span class="stage-card-num">${STAGES.indexOf(stage)+1}.</span>
+          <span class="stage-card-num">${idx+1}.</span>
           <span class="stage-card-title">${stage.icon} &nbsp;${stage.label}</span>
         </div>
         <div class="stage-card-status">
-          <span class="stage-card-count">${count} photo${count!==1?'s':''}</span>
+          <span class="stage-card-count">${isNA ? 'N/A' : count+' photo'+(count!==1?'s':'')}</span>
         </div>
       </div>
       <div class="stage-card-body">
         <div class="stage-help">${stage.help}</div>
-        ${grid}
-        <button class="btn btn-outline btn-sm" onclick="openPhotoCamera('${stage.id}')" style="width:100%;">
-          📷 &nbsp;Add ${stage.label.split(' ')[0]} Photo
-        </button>
+        ${naLabel}${grid}${photoBtn}${naBtn}
       </div>
     </div>`;
   }).join('<div style="height:8px;"></div>');
@@ -1373,12 +1442,27 @@ function renderCaptureScreen(){
   updateSubmitBtn();
 }
 
+function toggleStageNA(stageId){
+  const st = S.stages[stageId];
+  if(!st) return;
+  if(st.photos.length > 0){
+    toast('Remove photos before marking this stage N/A', 'err');
+    return;
+  }
+  st.na = !st.na;
+  renderCaptureScreen();
+}
+
 function updateSubmitBtn(){
   // Submit/Save button enables when all 5 stages have at least 1 photo
   // (saved or unsaved) for a fresh shipment, OR — for a reopen — when
   // any new photos exist.
-  const allStagesPresent = STAGES.every(s => (S.stages[s.id]?.photos?.length || 0) > 0);
-  const hasNew = STAGES.some(s => {
+  const stages = activeStages();
+  const allStagesPresent = stages.every(s => {
+    const st = S.stages[s.id];
+    return (st?.photos?.length || 0) > 0 || st?.na === true;
+  });
+  const hasNew = stages.some(s => {
     const st = S.stages[s.id]; return st && st.photos.length > st.savedCount;
   });
 
@@ -1407,15 +1491,18 @@ function updateSubmitBtn(){
       ? 'New photos will be uploaded and order marked Complete.'
       : 'Add photos if needed, or close now to mark as Complete.';
   } else {
-    // New shipment: require all 5 stages
+    // New shipment: require all stages (photo or N/A)
     btn.disabled = !allStagesPresent;
     btn.style.opacity = allStagesPresent ? '1' : '0.5';
     lbl.textContent = 'Complete Shipment';
-    const missing = STAGES.filter(s => (S.stages[s.id]?.photos?.length || 0) === 0).length;
+    const missing = stages.filter(s => {
+      const st = S.stages[s.id];
+      return (st?.photos?.length || 0) === 0 && st?.na !== true;
+    }).length;
     if(missing === 0){
       help.textContent = 'All stages captured — ready to submit.';
     } else {
-      help.textContent = `${missing} stage${missing!==1?'s':''} still need at least 1 photo.`;
+      help.textContent = `${missing} stage${missing!==1?'s':''} still need at least 1 photo (or mark N/A).`;
     }
   }
 }
@@ -1425,7 +1512,7 @@ function updateSubmitBtn(){
 // ═══════════════════════════════════════════════════
 async function openPhotoCamera(stageId){
   S.photoTargetStage = stageId;
-  const stage = STAGES.find(s => s.id === stageId) || (stageId === 'ShippingLabel' ? LABEL_STAGE : null);
+  const stage = [...STAGES, ...STAGES_L, LABEL_STAGE].find(s => s.id === stageId) || null;
   document.getElementById('cam-stage-label').textContent = stage ? stage.label : 'Photo';
   const camWrap = document.getElementById('photo-cam-wrap');
   camWrap.style.display='block';
@@ -1484,7 +1571,7 @@ function removeStagePhoto(stageId, idx){
 function captureBack(){
   // For a brand-new shipment in progress, going back means abandoning
   // the in-flight Shipments row + any uploaded photos. Warn the user.
-  const hasAnyWork = STAGES.some(s => (S.stages[s.id]?.photos?.length || 0) > 0);
+  const hasAnyWork = activeStages().some(s => (S.stages[s.id]?.photos?.length || 0) > 0);
   if(S.isShippingLabel){
     resetState();
     showScreen('screen-scan');
@@ -1521,15 +1608,24 @@ async function submitShipment(){
   if(S.isShippingLabel){ await submitShippingLabel(); return; }
 
   // Validation
-  const allStagesPresent = STAGES.every(s => (S.stages[s.id]?.photos?.length || 0) > 0);
+  const stages = activeStages();
+  const allStagesPresent = stages.every(s => {
+    const st = S.stages[s.id];
+    return (st?.photos?.length || 0) > 0 || st?.na === true;
+  });
   if(!S.isReopen && !allStagesPresent){
-    toast('All 5 stages need at least 1 photo','err'); return;
+    const missing = stages.filter(s => {
+      const st = S.stages[s.id];
+      return (st?.photos?.length || 0) === 0 && st?.na !== true;
+    }).length;
+    toast(`${missing} stage${missing!==1?'s':''} still need at least 1 photo (or mark N/A)`,'err');
+    return;
   }
 
   const newPhotos = []; // [{stageId, dataUrl, sequence}]
-  for(const stage of STAGES){
+  for(const stage of stages){
     const st = S.stages[stage.id];
-    if(!st) continue;
+    if(!st || st.na) continue;
     for(let i=st.savedCount; i<st.photos.length; i++){
       newPhotos.push({stageId: stage.id, dataUrl: st.photos[i], sequence: i+1});
     }
@@ -1709,8 +1805,8 @@ async function submitShippingLabel(){
 }
 
 function finalizeSubmitScreen(uploadedCount){
-  const totalPhotos = STAGES.reduce((acc,s) => acc + (S.stages[s.id]?.photos?.length||0), 0);
-  document.getElementById('done-order').textContent    = S.orderNum;
+  const totalPhotos = activeStages().reduce((acc,s) => acc + (S.stages[s.id]?.photos?.length||0), 0);
+  document.getElementById('done-order').textContent    = S.displayOrderNum || S.orderNum;
   document.getElementById('done-shipment').textContent = S.shipmentId;
   document.getElementById('done-photos').textContent   = totalPhotos;
   document.getElementById('done-user').textContent     = S.user?.name||S.user?.username||'';
@@ -1829,9 +1925,10 @@ function goBack(id){ stopScanner(); stopPhotoCamera(); showScreen(id); }
 
 function resetState(){
   stopScanner(); stopPhotoCamera();
-  S.orderNum=null; S.shipmentId=null; S.shipmentSeq=null; S.shipmentItemId=null;
+  S.orderNum=null; S.displayOrderNum=null; S.shipmentId=null; S.shipmentSeq=null; S.shipmentItemId=null;
   S.stages = {};
-  S.isReopen=false; S.reopenCode=''; S.reopenNote=''; S.orderComment=''; S.isShippingLabel=false;
+  S.isReopen=false; S.reopenCode=''; S.reopenNote=''; S.orderComment='';
+  S.isShippingLabel=false; S.isLWorkflow=false;
   S.photoTargetStage=null;
   const orderInput = document.getElementById('order-input');
   if(orderInput) orderInput.value='';
@@ -1992,6 +2089,7 @@ function renderRecentList(){
         ? `<span style="color:var(--amber);font-size:10px;"> (+${o.latePhotoCount} late)</span>`
         : '';
       const sid = o.shipmentId || o.orderNum;
+      const displayNum = o.orderNum.endsWith('-L') ? o.orderNum.slice(0,-2) : o.orderNum;
       const suffix = sid !== o.orderNum
         ? `<span style="font-family:var(--font-mono);font-size:11px;color:var(--red);margin-left:6px;">${sid.replace(o.orderNum,'').replace(/^-/,'')}</span>`
         : '';
@@ -2003,7 +2101,7 @@ function renderRecentList(){
       return `
         <div class="order-row" onclick="selectRecentOrder('${sid}')">
           <div class="order-row-left">
-            <div class="order-row-num">${o.orderNum}${suffix}${statusBadge}</div>
+            <div class="order-row-num">${displayNum}${suffix}${statusBadge}</div>
             <div class="order-row-meta">${o.packedBy}</div>
           </div>
           <div class="order-row-right">
@@ -2030,8 +2128,9 @@ async function selectRecentOrder(shipmentIdOrOrderNum){
   const startedStr = order.started ? new Date(order.started).toLocaleString() : '—';
   const completedStr = order.completed ? new Date(order.completed).toLocaleString() : '—';
 
-  document.getElementById('detail-header-num').textContent  = order.shipmentId || order.orderNum;
-  document.getElementById('detail-order-num').textContent   = order.orderNum;
+  const detailDisplayNum = order.orderNum.endsWith('-L') ? order.orderNum.slice(0,-2) : order.orderNum;
+  document.getElementById('detail-header-num').textContent  = order.shipmentId || detailDisplayNum;
+  document.getElementById('detail-order-num').textContent   = detailDisplayNum;
   document.getElementById('detail-shipment-id').textContent = order.shipmentId || '—';
   document.getElementById('detail-status').textContent      = order.status || '—';
   document.getElementById('detail-photo-count').textContent = order.photoCount + ' photo' + (order.photoCount!==1?'s':'')
@@ -2089,19 +2188,23 @@ async function loadOrderPhotoDetail(orderNum, shipmentId){
       return;
     }
 
+    // Pick the right stage list based on order suffix
+    const detailStages = orderNum.endsWith('-L') ? STAGES_L : STAGES;
+
     // Group by Stage
     const byStage = {};
-    for(const stage of STAGES) byStage[stage.id] = [];
+    for(const stage of detailStages) byStage[stage.id] = [];
     for(const p of allPhotos){
       const sid = p.Stage || 'Unknown';
       if(!byStage[sid]) byStage[sid] = [];
       byStage[sid].push(p);
     }
 
+    const allStageDefs = [...STAGES, ...STAGES_L, LABEL_STAGE];
     const makeThumb = (p) => {
       const isLate = p.Added_After_Completion;
       const spUrl  = p.SharePoint_URL || '#';
-      const stageDef = STAGES.find(s => s.id === p.Stage) || (p.Stage === 'ShippingLabel' ? LABEL_STAGE : null);
+      const stageDef = allStageDefs.find(s => s.id === p.Stage);
       const lbl = (stageDef ? stageDef.label.split(' ')[0] : (p.Stage||'Photo')) + ' ' + (p.Photo_Sequence||'');
       const lateTag = isLate
         ? `<div class="late-tag" title="${p.Reason_Code||''}${p.Reason_Note?' — '+p.Reason_Note:''}">+Later</div>`
@@ -2115,7 +2218,7 @@ async function loadOrderPhotoDetail(orderNum, shipmentId){
       </div>`;
     };
 
-    let html = STAGES.map(stage => {
+    let html = detailStages.map(stage => {
       const photos = byStage[stage.id] || [];
       const count = photos.length;
       return `<div class="box-section">
@@ -2131,7 +2234,7 @@ async function loadOrderPhotoDetail(orderNum, shipmentId){
       </div>`;
     }).join('<div style="height:8px;"></div>');
 
-    // Shipping Label section (separate from the 5 packing stages)
+    // Shipping Label section (always shown separately regardless of workflow)
     const labelPhotos = allPhotos.filter(p => p.Stage === 'ShippingLabel');
     if(labelPhotos.length > 0){
       const lc = labelPhotos.length;
@@ -2148,7 +2251,7 @@ async function loadOrderPhotoDetail(orderNum, shipmentId){
     }
 
     // Surface any truly unexpected Stage values (data drift / older rows)
-    const knownIds = new Set([...STAGES.map(s => s.id), 'ShippingLabel']);
+    const knownIds = new Set([...STAGES.map(s=>s.id), ...STAGES_L.map(s=>s.id), 'ShippingLabel']);
     const unknownPhotos = allPhotos.filter(p => !knownIds.has(p.Stage));
     if(unknownPhotos.length > 0){
       html += '<div style="height:8px;"></div>';
@@ -2252,7 +2355,8 @@ function startReopenFlow(){
   const order = recentState.selectedOrder;
   if(!order) return;
 
-  document.getElementById('reason-order-num').textContent = order.orderNum;
+  document.getElementById('reason-order-num').textContent =
+    order.orderNum.endsWith('-L') ? order.orderNum.slice(0,-2) : order.orderNum;
   const dt = new Date(order.created);
   const dateStr = dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
   document.getElementById('reason-order-meta').textContent =
@@ -2325,7 +2429,10 @@ async function confirmReopen(){
       .sort((a,b) => (a.Photo_Sequence||0) - (b.Photo_Sequence||0));
 
     // Set up state
+    const isL = order.orderNum.endsWith('-L');
     S.orderNum         = order.orderNum;
+    S.displayOrderNum  = isL ? order.orderNum.slice(0, -2) : order.orderNum;
+    S.isLWorkflow      = isL;
     S.shipmentId       = order.shipmentId;
     S.shipmentSeq      = order.shipmentSeq;
     S.shipmentItemId   = order.shipmentItemId;
@@ -2353,8 +2460,8 @@ async function confirmReopen(){
     }
 
     // UI labels
-    document.getElementById('capture-order-label').textContent = S.orderNum;
-    document.getElementById('progress-order-num').textContent  = S.orderNum;
+    document.getElementById('capture-order-label').textContent = S.displayOrderNum || S.orderNum;
+    document.getElementById('progress-order-num').textContent  = S.displayOrderNum || S.orderNum;
     document.getElementById('progress-tagline').textContent    =
       `Re-opened ${S.shipmentId} — ${reasonCode}`;
     document.getElementById('capture-reopen-badge').style.display = 'inline-flex';
@@ -2615,15 +2722,19 @@ async function dupAddShippingLabel(){
       .sort((a,b) => (a.fields?.Photo_Sequence||0) - (b.fields?.Photo_Sequence||0));
 
     // Set up state
-    S.orderNum        = dupState.orderNum || s.shipmentId.split('-S')[0];
-    S.shipmentId      = s.shipmentId;
-    S.shipmentSeq     = s.seq;
-    S.shipmentItemId  = s.shipmentItemId;
-    S.isShippingLabel = true;
-    S.isReopen        = false;
-    S.reopenCode      = '';
-    S.reopenNote      = '';
-    S.orderComment    = s.comment || '';
+    const rawOrderNum     = dupState.orderNum || s.shipmentId.split('-S')[0];
+    const isL             = rawOrderNum.endsWith('-L');
+    S.orderNum            = rawOrderNum;
+    S.displayOrderNum     = isL ? rawOrderNum.slice(0,-2) : rawOrderNum;
+    S.isLWorkflow         = isL;
+    S.shipmentId          = s.shipmentId;
+    S.shipmentSeq         = s.seq;
+    S.shipmentItemId      = s.shipmentItemId;
+    S.isShippingLabel     = true;
+    S.isReopen            = false;
+    S.reopenCode          = '';
+    S.reopenNote          = '';
+    S.orderComment        = s.comment || '';
     S.stages          = {};
     S.stages['ShippingLabel'] = {
       photos:     existingLabel.map(p => p.fields?.SharePoint_URL || ''),
@@ -2632,8 +2743,8 @@ async function dupAddShippingLabel(){
     };
 
     // Configure capture screen header
-    document.getElementById('capture-order-label').textContent = S.orderNum;
-    document.getElementById('progress-order-num').textContent  = S.orderNum;
+    document.getElementById('capture-order-label').textContent = S.displayOrderNum || S.orderNum;
+    document.getElementById('progress-order-num').textContent  = S.displayOrderNum || S.orderNum;
     document.getElementById('progress-tagline').textContent    = `${S.shipmentId} — shipping label photo`;
     const badge = document.getElementById('capture-reopen-badge');
     badge.textContent    = '🏷️ Label';
@@ -2674,8 +2785,9 @@ function dupViewPrevious(){
   const dt = new Date(s.created);
   const startedStr = s.started ? new Date(s.started).toLocaleString() : '—';
   const completedStr = s.completed ? new Date(s.completed).toLocaleString() : '—';
+  const dupDisplayNum = orderNum.endsWith('-L') ? orderNum.slice(0,-2) : orderNum;
   document.getElementById('detail-header-num').textContent  = s.shipmentId;
-  document.getElementById('detail-order-num').textContent   = orderNum;
+  document.getElementById('detail-order-num').textContent   = dupDisplayNum;
   document.getElementById('detail-shipment-id').textContent = s.shipmentId;
   document.getElementById('detail-status').textContent      = s.status || '—';
   document.getElementById('detail-photo-count').textContent = (s.photoCount||0) + ' photos';
@@ -2712,10 +2824,14 @@ async function dupAddToExisting(){
 function dupStartNew(){
   const maxSeq = dupState.shipments.reduce((m,s)=>Math.max(m, Number(s.seq)||1), 0);
 
-  S.orderNum       = dupState.orderNum;
-  S.shipmentSeq    = maxSeq + 1;
-  S.shipmentId     = `${dupState.orderNum}-S${S.shipmentSeq}`;
-  S.shipmentItemId = null;
+  const rawNum      = dupState.orderNum;
+  const isL         = rawNum.endsWith('-L');
+  S.orderNum        = rawNum;
+  S.displayOrderNum = isL ? rawNum.slice(0,-2) : rawNum;
+  S.isLWorkflow     = isL;
+  S.shipmentSeq     = maxSeq + 1;
+  S.shipmentId      = `${rawNum}-S${S.shipmentSeq}`;
+  S.shipmentItemId  = null;
   S.isReopen        = false;
   S.reopenCode      = '';
   S.reopenNote      = '';
@@ -2724,7 +2840,11 @@ function dupStartNew(){
   S.stages          = emptyStages();
 
   closeDupDialog();
-  document.getElementById('confirm-num').textContent = dupState.orderNum;
+  document.getElementById('confirm-num').textContent = S.displayOrderNum || S.orderNum;
+  document.getElementById('confirm-hero-sub').textContent  = isL ? 'Work Order Number' : 'GP Order Number';
+  document.getElementById('confirm-help-text').textContent = isL
+    ? 'Confirm this order number matches your Google Sheet work order. All photos will be filed under this number.'
+    : 'Confirm this order number matches your picking ticket. All photos will be filed under this number.';
   showScreen('screen-confirm');
 }
 
