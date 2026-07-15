@@ -1995,16 +1995,21 @@ async function loadRecentOrders(){
 
     const cutoff = new Date(Date.now() - RECENT_DAYS*24*60*60*1000).toISOString();
 
-    // Shipments query
-    const shipFilter = `fields/Created ge '${cutoff}'`;
+    // Shipments query — no server-side date filter (Created is unindexed and causes
+    // random failures). Fetch the 500 most-recent rows by ID and filter client-side.
     const shipUrl = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listShipments}/items`+
-      `?$expand=fields&$filter=${encodeURIComponent(shipFilter)}&$orderby=id desc&$top=500`;
+      `?$expand=fields&$orderby=id desc&$top=500`;
     const shipRes = await fetch(shipUrl, {
-      headers:{ Authorization:`Bearer ${token}`, Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly' }
+      headers:{ Authorization:`Bearer ${token}` }
     });
-    if(!shipRes.ok){ const e=await shipRes.json(); throw new Error(e.error?.message||'Query failed'); }
+    if(!shipRes.ok){ const e=await shipRes.json().catch(()=>({})); throw new Error(e.error?.message||'Shipments query failed'); }
     const shipData = await shipRes.json();
-    const shipItems = (shipData.value||[]).filter(i => i.fields?.Is_Deleted !== true);
+    const shipItems = (shipData.value||[])
+      .filter(i => i.fields?.Is_Deleted !== true)
+      .filter(i => {
+        const d = i.fields?.Started_DateTime || i.fields?.Created || i.createdDateTime;
+        return !d || d >= cutoff;
+      });
 
     const orders = shipItems.map(item => {
       const f = item.fields;
