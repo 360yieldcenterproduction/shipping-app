@@ -2031,8 +2031,24 @@ async function loadRecentOrders(){
     const photoRes = await fetch(photoUrl, {
       headers:{ Authorization:`Bearer ${token}`, Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly' }
     });
-    const photoData = photoRes.ok ? await photoRes.json() : { value:[] };
-    const photos = (photoData.value||[]).filter(p => p.fields?.Is_Deleted !== true);
+    let photos = [];
+    if(photoRes.ok){
+      const photoData = await photoRes.json();
+      photos = (photoData.value||[]).filter(p => p.fields?.Is_Deleted !== true);
+    } else {
+      console.warn('Photo count filter rejected — falling back to full scan');
+      const shipIds = new Set(orders.map(o => o.shipmentId).filter(Boolean));
+      const fb = await fetch(
+        `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listPhotos}/items?$expand=fields&$top=2000`,
+        { headers:{ Authorization:`Bearer ${token}`, Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly' } }
+      );
+      if(fb.ok){
+        const d = await fb.json();
+        photos = (d.value||[]).filter(p =>
+          p.fields?.Is_Deleted !== true && shipIds.has(p.fields?.Shipment_ID)
+        );
+      }
+    }
 
     const photoCount = {}, lateCount = {};
     for(const p of photos){
