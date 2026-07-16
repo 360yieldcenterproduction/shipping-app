@@ -434,16 +434,13 @@ async function searchShipments(forceRecent=false){
     let items = [];
 
     if(order){
-      items = await queryShipmentItems(token, `fields/GP_Order_Number eq '${escapeODataText(order)}'`, 500);
+      items = await queryShipmentItems(token, `fields/GP_Order_Number eq '${escapeODataText(order)}'`);
     } else {
-      const fromIso = from ? new Date(from + 'T00:00:00').toISOString() : new Date(Date.now() - 30*24*60*60*1000).toISOString();
-      const toIso = to ? new Date(to + 'T23:59:59').toISOString() : new Date().toISOString();
+      // Strip milliseconds — SharePoint OData rejects .000Z in $filter
+      const fromIso = (from ? new Date(from + 'T00:00:00') : new Date(Date.now() - 30*24*60*60*1000)).toISOString().replace(/\.\d+Z$/, 'Z');
+      const toIso   = (to   ? new Date(to   + 'T23:59:59') : new Date()).toISOString().replace(/\.\d+Z$/, 'Z');
       const filter = `fields/Created ge '${fromIso}' and fields/Created le '${toIso}'`;
-      try{ items = await queryShipmentItems(token, filter, 500, true); }
-      catch(e){
-        console.warn('Date filter failed; falling back to latest 500', e);
-        items = await queryShipmentItems(token, null, 500, true);
-      }
+      items = await queryShipmentItems(token, filter);
     }
 
     const shipments = items.map(normalizeShipment).filter(s => includeDeleted || !s.isDeleted);
@@ -459,26 +456,23 @@ async function searchShipments(forceRecent=false){
   }
 }
 
-async function queryShipmentItems(token, filterExpr, top=500, orderDesc=false){
-  let url = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listShipments}/items?$expand=fields&$top=${top}`;
-  if(filterExpr) url += `&$filter=${encodeURIComponent(filterExpr)}`;
-  if(orderDesc) url += `&$orderby=id desc`;
-  const res = await fetch(url, { headers:{ Authorization:`Bearer ${token}`, Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly' } });
-  if(res.ok){ const data = await res.json(); return data.value || []; }
-
-  // Fallback: full scan of the most recent 500 list rows. This helps when a column is not indexed.
-  const fbUrl = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listShipments}/items?$expand=fields&$orderby=id desc&$top=500`;
-  const fb = await fetch(fbUrl, { headers:{ Authorization:`Bearer ${token}`, Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly' } });
-  if(!fb.ok){
-    let msg = `SharePoint shipment query failed (${fb.status})`;
-    try{ const e = await fb.json(); msg = e.error?.message || msg; }catch{}
-    throw new Error(msg);
+async function queryShipmentItems(token, filterExpr){
+  // Paginate through all result pages so we never miss rows.
+  const allItems = [];
+  let nextUrl = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listShipments}/items`+
+    `?$expand=fields&$filter=${encodeURIComponent(filterExpr)}&$orderby=fields/Created desc&$top=500`;
+  while(nextUrl){
+    const res = await fetch(nextUrl, { headers:{ Authorization:`Bearer ${token}`, Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly' } });
+    if(!res.ok){
+      let msg = `SharePoint shipment query failed (${res.status})`;
+      try{ const e = await res.json(); msg = e.error?.message || msg; }catch{}
+      throw new Error(msg);
+    }
+    const data = await res.json();
+    allItems.push(...(data.value || []));
+    nextUrl = data['@odata.nextLink'] || null;
   }
-  const data = await fb.json();
-  let rows = data.value || [];
-  const order = document.getElementById('orderSearch').value.trim().toUpperCase();
-  if(order) rows = rows.filter(i => i.fields?.GP_Order_Number === order);
-  return rows;
+  return allItems;
 }
 
 function normalizeShipment(item){
@@ -507,21 +501,27 @@ function normalizeShipment(item){
 
 async function attachPhotoCounts(token, shipments, includeDeleted){
   if(!shipments.length) return;
-  const orderSet = new Set(shipments.map(s => s.orderNum).filter(Boolean));
-  const byShip = Object.fromEntries(shipments.map(s => [s.shipmentId, s]));
+  const shipIds = new Set(shipments.map(s => s.shipmentId).filter(Boolean));
+  const byShip  = Object.fromEntries(shipments.map(s => [s.shipmentId, s]));
 
-  // For one order, server-side filter is fast. For recent searches, pull latest 500 photo rows and count locally.
-  let photoRows = [];
   const order = document.getElementById('orderSearch').value.trim().toUpperCase();
+  let filterExpr;
   if(order){
-    photoRows = await queryPhotoItems(token, `fields/GP_Order_Number eq '${escapeODataText(order)}'`, 500);
+    filterExpr = `fields/GP_Order_Number eq '${escapeODataText(order)}'`;
   } else {
-    photoRows = await queryPhotoItems(token, null, 500);
+    // Mirror the same date window used for the shipments query
+    const from = document.getElementById('dateFrom').value;
+    const to   = document.getElementById('dateTo').value;
+    const fromIso = (from ? new Date(from + 'T00:00:00') : new Date(Date.now() - 30*24*60*60*1000)).toISOString().replace(/\.\d+Z$/, 'Z');
+    const toIso   = (to   ? new Date(to   + 'T23:59:59') : new Date()).toISOString().replace(/\.\d+Z$/, 'Z');
+    filterExpr = `fields/Created ge '${fromIso}' and fields/Created le '${toIso}'`;
   }
+
+  const photoRows = await queryPhotoItems(token, filterExpr);
   for(const item of photoRows){
     const p = item.fields || {};
     if(!includeDeleted && p.Is_Deleted === true) continue;
-    if(!orderSet.has(p.GP_Order_Number)) continue;
+    if(!shipIds.has(p.Shipment_ID)) continue;
     const s = byShip[p.Shipment_ID];
     if(!s) continue;
     s.photoCount += 1;
@@ -530,19 +530,23 @@ async function attachPhotoCounts(token, shipments, includeDeleted){
   }
 }
 
-async function queryPhotoItems(token, filterExpr, top=500){
-  let url = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listPhotos}/items?$expand=fields&$top=${top}`;
-  if(filterExpr) url += `&$filter=${encodeURIComponent(filterExpr)}`;
-  const res = await fetch(url, { headers:{ Authorization:`Bearer ${token}`, Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly' } });
-  if(res.ok){ const data = await res.json(); return data.value || []; }
-  const fb = await fetch(`https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listPhotos}/items?$expand=fields&$top=500`, { headers:{ Authorization:`Bearer ${token}`, Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly' } });
-  if(!fb.ok){
-    let msg = `SharePoint photo query failed (${fb.status})`;
-    try{ const e = await fb.json(); msg = e.error?.message || msg; }catch{}
-    throw new Error(msg);
+async function queryPhotoItems(token, filterExpr){
+  // Paginate through all result pages
+  const allItems = [];
+  let nextUrl = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listPhotos}/items`+
+    `?$expand=fields&$filter=${encodeURIComponent(filterExpr)}&$top=2000`;
+  while(nextUrl){
+    const res = await fetch(nextUrl, { headers:{ Authorization:`Bearer ${token}`, Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly' } });
+    if(!res.ok){
+      let msg = `SharePoint photo query failed (${res.status})`;
+      try{ const e = await res.json(); msg = e.error?.message || msg; }catch{}
+      throw new Error(msg);
+    }
+    const data = await res.json();
+    allItems.push(...(data.value || []));
+    nextUrl = data['@odata.nextLink'] || null;
   }
-  const data = await fb.json();
-  return data.value || [];
+  return allItems;
 }
 
 function applyClientFilters(){
