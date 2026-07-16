@@ -1993,23 +1993,26 @@ async function loadRecentOrders(){
     const token = await getToken();
     await ensureSpIds(token);
 
-    // Strip milliseconds — SharePoint OData rejects .000Z format in $filter values.
+    // Format cutoff without milliseconds (SharePoint OData rejects .000Z in $filter).
     const cutoff = new Date(Date.now() - RECENT_DAYS*24*60*60*1000).toISOString().replace(/\.\d+Z$/, 'Z');
+    const dateFilter = encodeURIComponent(`fields/Created ge '${cutoff}'`);
+    const prefer = 'HonorNonIndexedQueriesWarningMayFailRandomly';
 
-    // Shipments query — filter server-side on the system Created column (always indexed).
-    // We can't rely on $orderby=id desc because Graph API sorts IDs lexicographically
-    // ("9" > "1500"), so newest items don't appear in the first page when IDs exceed ~9.
-    const shipFilter = encodeURIComponent(`fields/Created ge '${cutoff}'`);
-    const shipUrl = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listShipments}/items`+
-      `?$expand=fields&$filter=${shipFilter}&$top=500`;
-    const shipRes = await fetch(shipUrl, {
-      headers:{ Authorization:`Bearer ${token}`, Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly' }
-    });
-    if(!shipRes.ok){ const e=await shipRes.json().catch(()=>({})); throw new Error(e.error?.message||'Shipments query failed'); }
-    const shipData = await shipRes.json();
-    const shipItems = (shipData.value||[]).filter(i => i.fields?.Is_Deleted !== true);
+    // Shipments — paginate through all pages so we never miss recent orders.
+    // $orderby=fields/Created desc ensures the first page has the newest rows,
+    // so even partial results are useful.
+    const allShipItems = [];
+    let shipNextUrl = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listShipments}/items`+
+      `?$expand=fields&$filter=${dateFilter}&$orderby=fields/Created desc&$top=500`;
+    while(shipNextUrl){
+      const res = await fetch(shipNextUrl, { headers:{ Authorization:`Bearer ${token}`, Prefer:prefer } });
+      if(!res.ok){ const e=await res.json().catch(()=>({})); throw new Error(e.error?.message||'Shipments query failed'); }
+      const data = await res.json();
+      allShipItems.push(...(data.value||[]).filter(i => i.fields?.Is_Deleted !== true));
+      shipNextUrl = data['@odata.nextLink'] || null;
+    }
 
-    const orders = shipItems.map(item => {
+    const orders = allShipItems.map(item => {
       const f = item.fields;
       return {
         shipmentItemId: item.id,
@@ -2027,18 +2030,21 @@ async function loadRecentOrders(){
       };
     });
 
-    // Photos query — no server-side filter, match client-side against loaded shipment IDs.
+    // Photos — same pagination pattern, filter server-side by date then client-side by shipmentId.
     const shipIds = new Set(orders.map(o => o.shipmentId).filter(Boolean));
-    const photoUrl = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listPhotos}/items`+
-      `?$expand=fields&$orderby=id desc&$top=2000`;
-    const photoRes = await fetch(photoUrl, { headers:{ Authorization:`Bearer ${token}` } });
-    let photos = [];
-    if(photoRes.ok){
-      const photoData = await photoRes.json();
-      photos = (photoData.value||[]).filter(p =>
+    const allPhotos = [];
+    let photoNextUrl = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listPhotos}/items`+
+      `?$expand=fields&$filter=${dateFilter}&$top=2000`;
+    while(photoNextUrl){
+      const res = await fetch(photoNextUrl, { headers:{ Authorization:`Bearer ${token}`, Prefer:prefer } });
+      if(!res.ok) break; // non-fatal — counts show 0 rather than crashing
+      const data = await res.json();
+      allPhotos.push(...(data.value||[]).filter(p =>
         p.fields?.Is_Deleted !== true && shipIds.has(p.fields?.Shipment_ID)
-      );
+      ));
+      photoNextUrl = data['@odata.nextLink'] || null;
     }
+    const photos = allPhotos;
 
     const photoCount = {}, lateCount = {};
     for(const p of photos){
