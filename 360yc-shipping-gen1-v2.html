@@ -2069,12 +2069,95 @@ async function loadRecentOrders(){
   }
 }
 
+let _liveSearchTimer = null;
+
 function filterRecentOrders(val){
   const q = val.trim().toUpperCase();
+  clearTimeout(_liveSearchTimer);
+  _liveSearchTimer = null;
+
   recentState.filtered = !q
     ? [...recentState.allOrders]
-    : recentState.allOrders.filter(o => (o.orderNum||'').includes(q) || (o.shipmentId||'').includes(q));
-  renderRecentList();
+    : recentState.allOrders.filter(o =>
+        (o.orderNum||'').toUpperCase().includes(q) ||
+        (o.shipmentId||'').toUpperCase().includes(q));
+
+  if(q.length >= 4 && recentState.filtered.length === 0){
+    // No local match — show spinner then do a live SharePoint lookup
+    document.getElementById('recent-list').innerHTML =
+      '<div class="empty-state"><div class="empty-icon">⏳</div>Searching SharePoint…</div>';
+    _liveSearchTimer = setTimeout(() => liveSearchOrder(q), 800);
+  } else {
+    renderRecentList();
+  }
+}
+
+async function liveSearchOrder(q){
+  const container = document.getElementById('recent-list');
+  try{
+    const token = await getToken();
+    await ensureSpIds(token);
+    const prefer = 'HonorNonIndexedQueriesWarningMayFailRandomly';
+
+    const flt = encodeURIComponent(`startswith(fields/GP_Order_Number,'${q}')`);
+    const url = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listShipments}/items`+
+      `?$expand=fields&$filter=${flt}&$top=20`;
+    const res = await fetch(url, { headers:{ Authorization:`Bearer ${token}`, Prefer:prefer } });
+    if(!res.ok) throw new Error('Live search failed');
+    const data = await res.json();
+    const items = (data.value||[]).filter(i => i.fields?.Is_Deleted !== true);
+
+    if(items.length === 0){
+      container.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div>No orders found</div>';
+      return;
+    }
+
+    const orders = items.map(item => {
+      const flds = item.fields;
+      return {
+        shipmentItemId: item.id,
+        orderNum:       flds.GP_Order_Number || '',
+        shipmentId:     flds.Shipment_ID || '',
+        shipmentSeq:    flds.Shipment_Sequence || 1,
+        status:         flds.Status || 'In Progress',
+        packedBy:       flds.Packer_Name || flds.Packer_Email || '—',
+        started:        flds.Started_DateTime || flds.Created || item.createdDateTime,
+        completed:      flds.Completed_DateTime || null,
+        created:        flds.Created || item.createdDateTime,
+        photoCount:     0,
+        latePhotoCount: 0,
+        comment:        flds.Order_Comment || '',
+      };
+    });
+
+    // Fetch photo counts for each result
+    const photoCount = {}, lateCount = {};
+    for(const o of orders){
+      if(!o.shipmentId) continue;
+      const pf = encodeURIComponent(`fields/Shipment_ID eq '${o.shipmentId}'`);
+      const pu = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listPhotos}/items`+
+        `?$expand=fields&$filter=${pf}&$top=200`;
+      const pr = await fetch(pu, { headers:{ Authorization:`Bearer ${token}`, Prefer:prefer } });
+      if(pr.ok){
+        const pd = await pr.json();
+        for(const p of (pd.value||[]).filter(p => p.fields?.Is_Deleted !== true)){
+          photoCount[o.shipmentId] = (photoCount[o.shipmentId]||0)+1;
+          if(p.fields?.Added_After_Completion) lateCount[o.shipmentId] = (lateCount[o.shipmentId]||0)+1;
+        }
+      }
+    }
+    for(const o of orders){
+      o.photoCount     = photoCount[o.shipmentId] || 0;
+      o.latePhotoCount = lateCount[o.shipmentId]  || 0;
+    }
+
+    orders.sort((a,b) => new Date(b.started||b.created) - new Date(a.started||a.created));
+    recentState.filtered = orders;
+    renderRecentList();
+  }catch(e){
+    container.innerHTML =
+      `<div class="empty-state"><div class="empty-icon">❌</div>Search failed: ${e.message}</div>`;
+  }
 }
 
 function setRecentCount(n){
