@@ -537,7 +537,10 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <div class="reopen-divider">
       <div class="reopen-divider-text">Make changes to this order</div>
     </div>
-    <button class="btn btn-outline" onclick="startReopenFlow()" style="border-color:var(--amber);color:var(--amber);">
+    <button class="btn btn-primary" id="btn-continue-shipment" onclick="continueShipment()" style="display:none;">
+      ▶ &nbsp;Continue Shipment
+    </button>
+    <button class="btn btn-outline" id="btn-reopen-shipment" onclick="startReopenFlow()" style="border-color:var(--amber);color:var(--amber);">
       ✏️ &nbsp;Re-open Order to Add Photos
     </button>
     <button class="btn btn-outline" onclick="startDeleteShipment()" style="border-color:var(--red);color:var(--red);margin-top:8px;">
@@ -679,6 +682,9 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <p id="submit-help" style="font-size:11px;color:var(--text-muted);text-align:center;line-height:1.5;margin-top:-2px;">
       All 5 stages need at least 1 photo to complete.
     </p>
+    <button class="btn btn-outline" id="btn-save-later" onclick="saveForLater()" style="display:none;margin-top:4px;">
+      💾 &nbsp;Save &amp; Come Back Later
+    </button>
 
     <div class="bottom-safe"></div>
   </div>
@@ -1470,6 +1476,8 @@ function updateSubmitBtn(){
   const lbl = document.getElementById('btn-submit-label');
   const help = document.getElementById('submit-help');
 
+  const saveLaterBtn = document.getElementById('btn-save-later');
+
   if(S.isShippingLabel){
     const labelSt  = S.stages['ShippingLabel'] || {photos:[], savedCount:0};
     const hasLabel = labelSt.photos.length > 0;
@@ -1482,6 +1490,7 @@ function updateSubmitBtn(){
       : hasNewLabel
         ? 'Label photo will be uploaded and order marked Shipped.'
         : 'Label already on file — mark as Shipped.';
+    if(saveLaterBtn) saveLaterBtn.style.display = 'none';
   } else if(S.isReopen){
     // Reopen: always enabled — photos are optional, just close to mark Complete
     btn.disabled = false;
@@ -1490,8 +1499,9 @@ function updateSubmitBtn(){
     help.textContent = hasNew
       ? 'New photos will be uploaded and order marked Complete.'
       : 'Add photos if needed, or close now to mark as Complete.';
+    if(saveLaterBtn) saveLaterBtn.style.display = 'none';
   } else {
-    // New shipment: require all stages (photo or N/A)
+    // New/continued shipment: require all stages (photo or N/A)
     btn.disabled = !allStagesPresent;
     btn.style.opacity = allStagesPresent ? '1' : '0.5';
     lbl.textContent = 'Complete Shipment';
@@ -1504,6 +1514,8 @@ function updateSubmitBtn(){
     } else {
       help.textContent = `${missing} stage${missing!==1?'s':''} still need at least 1 photo (or mark N/A).`;
     }
+    // Show "Save for Later" only once the Shipments row exists in SharePoint
+    if(saveLaterBtn) saveLaterBtn.style.display = S.shipmentItemId ? '' : 'none';
   }
 }
 
@@ -1587,13 +1599,11 @@ function captureBack(){
     return;
   }
   showDialog(
-    'Discard this shipment?',
-    'You have captured photos but haven\'t completed the shipment. Going back will leave the shipment as "In Progress" in SharePoint with whatever photos are already uploaded. You can resume it from Recent Orders.',
-    'Yes, leave',
+    'Leave without saving?',
+    'Photos you\'ve taken this session haven\'t been uploaded yet — they\'ll be lost if you leave now. Use "Save & Come Back Later" (at the bottom of the screen) to upload your photos first, then resume from Recent Orders.',
+    'Leave anyway',
     () => {
       closeDialog();
-      // Reset local state but DO NOT delete the Shipments row — it stays
-      // as "In Progress" so the user can find it later via Recent Orders.
       stopPhotoCamera();
       resetState();
       showScreen('screen-scan');
@@ -1720,6 +1730,77 @@ async function submitShipment(){
     hideOverlay();
     console.error('Submit failed:', e);
     toast('Upload failed: '+e.message,'err');
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  SAVE FOR LATER — uploads photos without completing
+// ═══════════════════════════════════════════════════
+async function saveForLater(){
+  const stages = activeStages();
+  const newPhotos = [];
+  for(const stage of stages){
+    const st = S.stages[stage.id];
+    if(!st || st.na) continue;
+    for(let i = st.savedCount; i < st.photos.length; i++){
+      newPhotos.push({stageId: stage.id, dataUrl: st.photos[i], sequence: i+1});
+    }
+  }
+
+  if(newPhotos.length === 0){
+    // Nothing new to upload — just leave (Shipments row already exists as In Progress)
+    toast('Progress saved — find this order in Recent Orders to continue','ok');
+    resetState();
+    showScreen('screen-scan');
+    return;
+  }
+
+  showOverlay(`Saving ${newPhotos.length} photo${newPhotos.length!==1?'s':''}…`);
+  try{
+    const token = await getToken();
+    await ensureSpIds(token);
+    const userName  = S.user?.name     || S.user?.username || '';
+    const userEmail = S.user?.username || S.user?.name     || '';
+    const now = new Date().toISOString();
+
+    let done = 0;
+    for(const p of newPhotos){
+      showOverlay(`Saving ${done+1}/${newPhotos.length} (${p.stageId})…`);
+      const blob     = dataUrlToBlob(p.dataUrl);
+      const fileName = `${S.shipmentId}_${p.stageId}_${p.sequence}_${Date.now()}.jpg`;
+      const folderPath = `${S.orderNum}/${S.shipmentId}/${p.stageId}`;
+      const spUrl    = await spUploadFile(token, folderPath, fileName, blob);
+
+      await spCreateListItem(token, CFG.listPhotos, {
+        Title:                  fileName,
+        GP_Order_Number:        S.orderNum,
+        Shipment_ID:            S.shipmentId,
+        Stage:                  p.stageId,
+        Photo_Sequence:         p.sequence,
+        SharePoint_URL:         spUrl,
+        File_Name:              fileName,
+        Captured_By:            userName,
+        Captured_Email:         userEmail,
+        Captured_DateTime:      now,
+        Added_After_Completion: false,
+        Reason_Code:            '',
+        Reason_Note:            '',
+        Is_Deleted:             false,
+      });
+
+      const st = S.stages[p.stageId];
+      st.savedCount = Math.max(st.savedCount, p.sequence);
+      done++;
+    }
+
+    hideOverlay();
+    toast(`${done} photo${done!==1?'s':''} saved — find this order in Recent Orders to continue`, 'ok');
+    resetState();
+    showScreen('screen-scan');
+  }catch(e){
+    hideOverlay();
+    console.error('saveForLater error:', e);
+    toast('Save failed: ' + e.message, 'err');
   }
 }
 
@@ -2237,6 +2318,10 @@ async function selectRecentOrder(shipmentIdOrOrderNum){
   document.getElementById('detail-stages').innerHTML =
     '<div class="empty-state"><div class="empty-icon">⏳</div>Loading photos…</div>';
 
+  const isInProgress = order.status === 'In Progress';
+  document.getElementById('btn-continue-shipment').style.display = isInProgress ? '' : 'none';
+  document.getElementById('btn-reopen-shipment').style.display   = isInProgress ? 'none' : '';
+
   showScreen('screen-detail');
   await loadOrderPhotoDetail(order.orderNum, order.shipmentId);
 }
@@ -2572,6 +2657,85 @@ async function confirmReopen(){
     hideOverlay();
     console.error('confirmReopen error:', e);
     toast('Failed to re-open: '+e.message,'err');
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  CONTINUE IN-PROGRESS SHIPMENT
+// ═══════════════════════════════════════════════════
+async function continueShipment(){
+  const order = recentState.selectedOrder;
+  if(!order) return;
+
+  showOverlay('Loading saved photos…');
+  try{
+    const token = await getToken();
+    await ensureSpIds(token);
+
+    const filterExpr = `fields/Shipment_ID eq '${order.shipmentId.replace(/'/g,"''")}'`;
+    const url = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listPhotos}/items`+
+      `?$expand=fields&$filter=${encodeURIComponent(filterExpr)}&$top=500`;
+    let res = await fetch(url, {
+      headers:{ Authorization:`Bearer ${token}`, Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly' }
+    });
+    let data;
+    if(res.ok){
+      data = await res.json();
+    } else {
+      const fb = await fetch(
+        `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listPhotos}/items?$expand=fields&$top=500`,
+        { headers:{ Authorization:`Bearer ${token}`, Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly' } }
+      );
+      if(!fb.ok) throw new Error('Could not load existing photos');
+      data = await fb.json();
+    }
+    const photos = (data.value||[])
+      .filter(p => p.fields?.Is_Deleted !== true)
+      .filter(p => p.fields?.Shipment_ID === order.shipmentId)
+      .map(p => p.fields)
+      .sort((a,b) => (a.Photo_Sequence||0) - (b.Photo_Sequence||0));
+
+    const isL = order.orderNum.endsWith('-L');
+    S.orderNum        = order.orderNum;
+    S.displayOrderNum = isL ? order.orderNum.slice(0,-2) : order.orderNum;
+    S.isLWorkflow     = isL;
+    S.shipmentId      = order.shipmentId;
+    S.shipmentSeq     = order.shipmentSeq;
+    S.shipmentItemId  = order.shipmentItemId;
+    S.isReopen        = false;
+    S.isShippingLabel = false;
+    S.reopenCode      = '';
+    S.reopenNote      = '';
+    S.orderComment    = order.comment || '';
+    S.stages          = emptyStages();
+
+    for(const p of photos){
+      const sid = p.Stage;
+      if(!S.stages[sid]) continue;
+      S.stages[sid].photos.push(p.SharePoint_URL || '');
+      S.stages[sid].savedUrls.push(p.SharePoint_URL || '');
+      S.stages[sid].savedCount++;
+    }
+
+    document.getElementById('capture-order-label').textContent = S.displayOrderNum || S.orderNum;
+    document.getElementById('progress-order-num').textContent  = S.displayOrderNum || S.orderNum;
+    document.getElementById('progress-tagline').textContent    = `Continuing ${S.shipmentId}`;
+    document.getElementById('capture-reopen-badge').style.display = 'none';
+    const commentEl = document.getElementById('order-comment');
+    if(commentEl){ commentEl.value = S.orderComment; updateCommentCounter(); }
+
+    hideOverlay();
+    renderCaptureScreen();
+    showScreen('screen-capture');
+    if(photos.length > 0){
+      toast(`${photos.length} saved photo${photos.length!==1?'s':''} loaded — continue where you left off`, 'ok');
+    } else {
+      toast('No saved photos yet — start capturing', 'ok');
+    }
+  }catch(e){
+    hideOverlay();
+    console.error('continueShipment error:', e);
+    toast('Could not load shipment: ' + e.message, 'err');
   }
 }
 
