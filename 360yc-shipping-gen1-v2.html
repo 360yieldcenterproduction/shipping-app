@@ -615,6 +615,17 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <button class="btn btn-primary" onclick="startCapture()" style="flex:2;">Confirm & Continue →</button>
       </div>
     </div>
+
+    <!-- RAIN Machine type selector (hidden for non-RAIN orders) -->
+    <div id="rain-type-card" class="card" style="display:none;border-top:3px solid var(--green);">
+      <div class="card-label" style="color:var(--green);">🌧️ &nbsp;RAIN Machine — Select Shipping Method</div>
+      <div class="btn-row" style="gap:10px;">
+        <button class="btn btn-outline" id="btn-rain-trailer" onclick="selectRainType('Trailer')" style="flex:1;">🚛&nbsp;Trailer</button>
+        <button class="btn btn-outline" id="btn-rain-container" onclick="selectRainType('Container')" style="flex:1;">🚢&nbsp;Container</button>
+      </div>
+      <div id="rain-type-hint" style="text-align:center;font-size:12px;color:var(--text-muted);margin-top:8px;">Select a shipping method before tapping "Confirm &amp; Continue"</div>
+    </div>
+
     <div class="bottom-safe"></div>
   </div>
 </div>
@@ -655,13 +666,14 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <div class="card-label" id="cam-stage-label">Photo</div>
         <div class="camera-wrap">
           <video id="photo-video" autoplay playsinline muted></video>
-          <div class="cam-overlay"><div class="cam-xhair-sq"></div></div>
+          <div class="cam-overlay"></div>
         </div>
         <div class="btn-row" style="margin-top:9px;">
           <button class="btn btn-outline" onclick="stopPhotoCamera()">✕ Cancel</button>
           <button class="btn btn-primary" onclick="capturePhoto()">📸 Capture</button>
         </div>
         <canvas id="capture-canvas"></canvas>
+        <input type="file" id="photo-upload-input" accept="image/*" multiple style="display:none" onchange="handlePhotoUpload(event)">
       </div>
     </div>
 
@@ -891,6 +903,53 @@ const STAGES_L = [
    help:'One photo per page of the completed audit sheet.'},
 ];
 
+// ── RAIN MACHINE WORKFLOW ─────────────────────────────────────────────────────
+// Container flow: Build (optional) → Container Number → Lifts → Final Packed → Seal
+const STAGES_M_BUILD_CONTAINER = [
+  {id:'M_CBuild',      label:'Build Photos',      icon:'🔨', canSkip:true,
+   help:'Assembly build photos — skip if this step is not needed.'},
+];
+const STAGES_M_LOAD_CONTAINER = [
+  {id:'M_CNumber',     label:'Container Number',  icon:'📦', canSkip:false,
+   help:'Photo of the container number painted on the outside of the container.'},
+  {id:'M_CLifts',      label:'Lift Photos',       icon:'🏗️', canSkip:true,
+   help:'Add one photo per lift (up to 15). Photos are numbered automatically.'},
+  {id:'M_CFinalPacked',label:'Final Packed',      icon:'✅', canSkip:false,
+   help:'Photos of the machine fully packed and secured in the container.'},
+  {id:'M_CSeal',       label:'Container Seal',    icon:'🔒', canSkip:false,
+   help:'Photo of the container seal affixed and visible.'},
+];
+
+// Trailer flow: Build (optional) → Open Crate sub-stages → Loaded Crate → Machine docs
+const STAGES_M_BUILD_TRAILER = [
+  {id:'M_TBuild',         label:'Build Photos',                    icon:'🔨', canSkip:true,
+   help:'Build phase photos — add as many as needed, skip if not applicable.'},
+];
+const STAGES_M_LOAD_TRAILER = [
+  {id:'M_TOpenCrate_Drops',   label:'Open Crate — Drops',         icon:'📦', canSkip:true,
+   help:'Photo of Drops in the open crate before sealing.'},
+  {id:'M_TOpenCrate_Planter', label:'Open Crate — Planter Kit',   icon:'🌱', canSkip:true,
+   help:'Photo of the Planter Kit in the open crate.'},
+  {id:'M_TOpenCrate_Base',    label:'Open Crate — Base Station',  icon:'📡', canSkip:true,
+   help:'Photo of the Base Station in the open crate.'},
+  {id:'M_TOpenCrate_Shields', label:'Open Crate — Wheel Shields', icon:'🛡️', canSkip:true,
+   help:'Photo of the Wheel Shields in the open crate.'},
+  {id:'M_TOpenCrate_Other',   label:'Open Crate — Other',         icon:'📦', canSkip:true,
+   help:'Any additional contents in the open crate.'},
+  {id:'M_TLoadedCrate_Lid',   label:'Loaded Crate — Lid',         icon:'📦', canSkip:true,
+   help:'Photo of the loaded and sealed crate lid.'},
+  {id:'M_TLoadedCrate_Serial',label:'Loaded Crate — Last 3 of Serial #', icon:'🔢', canSkip:true,
+   help:'Photo showing the last 3 digits of the serial number marked on the crate.'},
+  {id:'M_TMachine_Serial',    label:'Machine Serial # Tag',        icon:'🏷️', canSkip:true,
+   help:'Photo of the machine serial number tag.'},
+  {id:'M_TMachine_Side',      label:'Side View Loaded',            icon:'📸', canSkip:true,
+   help:'Side view of the entire loaded shipment on the trailer.'},
+  {id:'M_TMachine_Rear',      label:'Rear View',                   icon:'📸', canSkip:true,
+   help:'Rear view of the loaded shipment.'},
+  {id:'M_TMachine_Strapping', label:'Strapping',                   icon:'🔗', canSkip:true,
+   help:'Photo showing all strapping and tie-downs securing the load.'},
+];
+
 if(IS_TEST_ENV){
   console.log('%c🧪 TEST ENVIRONMENT — using *_TEST lists',
     'background:#f59e0b;color:#000;font-weight:900;padding:4px 10px;font-size:13px;border-radius:4px;');
@@ -932,6 +991,9 @@ let S = {
   isShippingLabel:false,
   // Control Panel / Skid workflow (order number ends with -L)
   isLWorkflow:false,
+  // RAIN Machine workflow (detected via Google Sheet lookup; stored with -MC or -MT suffix)
+  isRainWorkflow:false,
+  rainShipType:null,   // 'Container' | 'Trailer'
   // Order-level comment (optional, set on capture screen after Audit Sheet)
   orderComment:'',
 };
@@ -950,7 +1012,56 @@ function updateCommentCounter(){
   if(el && counter) counter.textContent = `${el.value.length}/100`;
 }
 
-function activeStages(){ return S.isLWorkflow ? STAGES_L : STAGES; }
+function activeStages(){
+  if(S.isRainWorkflow){
+    if(S.rainShipType==='Container') return [...STAGES_M_BUILD_CONTAINER,...STAGES_M_LOAD_CONTAINER];
+    if(S.rainShipType==='Trailer')   return [...STAGES_M_BUILD_TRAILER,...STAGES_M_LOAD_TRAILER];
+    return [];
+  }
+  return S.isLWorkflow ? STAGES_L : STAGES;
+}
+
+function allKnownStages(){
+  return [...STAGES,...STAGES_L,
+          ...STAGES_M_BUILD_CONTAINER,...STAGES_M_LOAD_CONTAINER,
+          ...STAGES_M_BUILD_TRAILER,...STAGES_M_LOAD_TRAILER,
+          LABEL_STAGE];
+}
+
+// Detect workflow type from a stored order number suffix.
+// Returns { type: 'L'|'MC'|'MT'|'standard', display: <suffix-stripped number> }
+function detectWorkflow(num){
+  if(num.endsWith('-L'))  return {type:'L',        display:num.slice(0,-2)};
+  if(num.endsWith('-MC')) return {type:'MC',        display:num.slice(0,-3)};
+  if(num.endsWith('-MT')) return {type:'MT',        display:num.slice(0,-3)};
+  return                         {type:'standard',  display:num};
+}
+
+function applyWorkflowState(wf){
+  S.isLWorkflow    = wf.type==='L';
+  S.isRainWorkflow = wf.type==='MC'||wf.type==='MT';
+  S.rainShipType   = wf.type==='MC'?'Container':wf.type==='MT'?'Trailer':null;
+  S.displayOrderNum = wf.display;
+}
+
+// Checks Brent's RAIN Machine Data sheet (column K = base ORDR number).
+// Returns true if the scanned order number matches any row → routes as RAIN order.
+async function checkRainSheet(orderNum){
+  const SHEET_ID = '1HMJALr3n8CHIh4dq9oed7QYstJaecrQxRapujgsZ53g';
+  const API_KEY  = 'AIzaSyCDyzrgfKWXAqvrz-eLFYNiEVI1W8XQ-2Q';
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Machine%20Data!A:K?key=${API_KEY}`;
+  try{
+    const res = await fetch(url);
+    if(!res.ok) return false;
+    const data = await res.json();
+    const rows = data.values || [];
+    const target = orderNum.substring(0,12).toUpperCase().trim();
+    return rows.some(row => String(row[10]||'').trim().toUpperCase() === target);
+  }catch(e){
+    console.warn('RAIN sheet check failed — defaulting to standard workflow:', e);
+    return false;
+  }
+}
 
 function emptyStages(stagesArr){
   const arr = stagesArr || activeStages();
@@ -1143,6 +1254,25 @@ function handleScan(val){
   submitOrderEntry();
 }
 
+function selectRainType(type){
+  S.rainShipType = type;
+  const btnT = document.getElementById('btn-rain-trailer');
+  const btnC = document.getElementById('btn-rain-container');
+  const green = 'var(--green)';
+  if(btnT){
+    btnT.style.background  = type==='Trailer' ? green : '';
+    btnT.style.color       = type==='Trailer' ? '#fff' : '';
+    btnT.style.borderColor = type==='Trailer' ? green  : '';
+  }
+  if(btnC){
+    btnC.style.background  = type==='Container' ? green : '';
+    btnC.style.color       = type==='Container' ? '#fff' : '';
+    btnC.style.borderColor = type==='Container' ? green  : '';
+  }
+  const hint = document.getElementById('rain-type-hint');
+  if(hint) hint.textContent = `✓ ${type} selected — tap "Confirm & Continue" to begin.`;
+}
+
 // ═══════════════════════════════════════════════════
 //  ORDER ENTRY → checks for duplicate shipments
 // ═══════════════════════════════════════════════════
@@ -1150,13 +1280,19 @@ async function submitOrderEntry(){
   const val = document.getElementById('order-input').value.trim().toUpperCase();
   if(!val){ toast('Please enter or scan an order number','err'); return; }
 
-  const isL = val.endsWith('-L');
-  S.orderNum        = val;
-  S.displayOrderNum = isL ? val.slice(0, -2) : val;
-  S.isLWorkflow     = isL;
+  const wf = detectWorkflow(val);
+  S.orderNum = val;
+  applyWorkflowState(wf);
 
   showOverlay('Checking order…');
   try{
+    // For standard orders, check Google Sheet for RAIN classification
+    if(wf.type==='standard'){
+      const isRain = await checkRainSheet(val);
+      S.isRainWorkflow = isRain;
+      S.rainShipType   = null;
+    }
+
     const token = await getToken();
     await ensureSpIds(token);
     const existing = await fetchExistingShipments(token, val);
@@ -1180,11 +1316,23 @@ async function submitOrderEntry(){
 
     document.getElementById('confirm-num').textContent = S.displayOrderNum;
     document.getElementById('confirm-hero-sub').textContent =
-      isL ? 'Work Order Number' : 'GP Order Number';
+      S.isRainWorkflow ? 'RAIN Machine Order' :
+      wf.type==='L'    ? 'Work Order Number'  : 'GP Order Number';
     document.getElementById('confirm-help-text').textContent =
-      isL
-        ? 'Confirm this order number matches your Google Sheet work order. All photos will be filed under this number.'
-        : 'Confirm this order number matches your picking ticket. All photos will be filed under this number.';
+      S.isRainWorkflow
+        ? 'This is a RAIN Machine order. Select Trailer or Container below, then tap "Confirm & Continue" to begin.'
+        : wf.type==='L'
+          ? 'Confirm this order number matches your Google Sheet work order. All photos will be filed under this number.'
+          : 'Confirm this order number matches your picking ticket. All photos will be filed under this number.';
+    // Show/reset RAIN type selector
+    const rainCard = document.getElementById('rain-type-card');
+    if(rainCard) rainCard.style.display = S.isRainWorkflow ? '' : 'none';
+    const rainHint = document.getElementById('rain-type-hint');
+    if(rainHint) rainHint.textContent = 'Select a shipping method before tapping "Confirm & Continue"';
+    ['btn-rain-trailer','btn-rain-container'].forEach(id=>{
+      const b=document.getElementById(id);
+      if(b){b.style.background='';b.style.color='';b.style.borderColor='';}
+    });
     showScreen('screen-confirm');
   }catch(e){
     hideOverlay();
@@ -1195,7 +1343,13 @@ async function submitOrderEntry(){
 
 // Returns array of shipment summary objects sorted by seq desc.
 async function fetchExistingShipments(token, orderNum){
-  const filterExpr = `fields/GP_Order_Number eq '${orderNum.replace(/'/g,"''")}'`;
+  const esc = s => s.replace(/'/g,"''");
+  // Also search RAIN suffix variants so a re-scan of a plain order number finds prior RAIN shipments
+  const _wf = detectWorkflow(orderNum);
+  const searchNums = _wf.type==='standard'
+    ? [orderNum, orderNum+'-MC', orderNum+'-MT']
+    : [orderNum];
+  const filterExpr = searchNums.map(n=>`fields/GP_Order_Number eq '${esc(n)}'`).join(' or ');
   const url = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listShipments}/items`+
     `?$expand=fields&$filter=${encodeURIComponent(filterExpr)}&$top=50`;
 
@@ -1279,6 +1433,17 @@ async function fetchExistingShipments(token, orderNum){
 //  CAPTURE SCREEN
 // ═══════════════════════════════════════════════════
 async function startCapture(){
+  if(S.isRainWorkflow && !S.rainShipType){
+    toast('Please select Trailer or Container first','err'); return;
+  }
+  // Encode RAIN ship type in the stored order number (-MC or -MT)
+  if(S.isRainWorkflow && S.rainShipType){
+    const suffix = S.rainShipType==='Container' ? '-MC' : '-MT';
+    if(!S.orderNum.endsWith(suffix)){
+      S.orderNum   = S.orderNum + suffix;
+      S.shipmentId = `${S.orderNum}-S${S.shipmentSeq}`;
+    }
+  }
   // Create the Shipments row up front so photos can attach to a real
   // shipment record. If creation fails, abort and surface the error.
   showOverlay('Starting shipment…');
@@ -1367,9 +1532,10 @@ function renderCaptureScreen(){
       <div class="stage-card-body">
         <div class="stage-help">${LABEL_STAGE.help}</div>
         ${grid}
-        <button class="btn btn-outline btn-sm" onclick="openPhotoCamera('ShippingLabel')" style="width:100%;">
-          📷 &nbsp;Add Label Photo
-        </button>
+        <div style="display:flex;gap:7px;">
+          <button class="btn btn-outline btn-sm" onclick="openPhotoCamera('ShippingLabel')" style="flex:1;">📷&nbsp;Camera</button>
+          <button class="btn btn-outline btn-sm" onclick="openPhotoUpload('ShippingLabel')" style="flex:1;">📁&nbsp;Upload</button>
+        </div>
       </div>
     </div>`;
     updateSubmitBtn();
@@ -1418,9 +1584,10 @@ function renderCaptureScreen(){
 
     const photoBtn = isNA
       ? ''
-      : `<button class="btn btn-outline btn-sm" onclick="openPhotoCamera('${stage.id}')" style="width:100%;margin-top:${count>0?'6px':'0'};">
-           📷 &nbsp;Add ${stage.label.split(' ')[0]} Photo
-         </button>`;
+      : `<div style="display:flex;gap:7px;margin-top:${count>0?'6px':'0'};">
+           <button class="btn btn-outline btn-sm" onclick="openPhotoCamera('${stage.id}')" style="flex:1;">📷&nbsp;Camera</button>
+           <button class="btn btn-outline btn-sm" onclick="openPhotoUpload('${stage.id}')" style="flex:1;">📁&nbsp;Upload</button>
+         </div>`;
 
     const naLabel = isNA
       ? `<div style="font-size:12px;color:var(--text-muted);font-style:italic;padding:4px 0 6px;">
@@ -1522,9 +1689,36 @@ function updateSubmitBtn(){
 // ═══════════════════════════════════════════════════
 //  PHOTO CAMERA (per-stage)
 // ═══════════════════════════════════════════════════
+let uploadTargetStage = null;
+
+function openPhotoUpload(stageId){
+  uploadTargetStage = stageId;
+  const input = document.getElementById('photo-upload-input');
+  input.value = '';
+  input.click();
+}
+
+async function handlePhotoUpload(evt){
+  const stageId = uploadTargetStage;
+  if(!stageId || !S.stages[stageId]) return;
+  const files = Array.from(evt.target.files);
+  if(!files.length) return;
+  for(const file of files){
+    const dataUrl = await new Promise((res,rej)=>{
+      const r = new FileReader();
+      r.onload = e => res(e.target.result);
+      r.onerror = rej;
+      r.readAsDataURL(file);
+    });
+    S.stages[stageId].photos.push(dataUrl);
+  }
+  renderCaptureScreen();
+  toast(`${files.length} photo${files.length!==1?'s':''} added`,'ok');
+}
+
 async function openPhotoCamera(stageId){
   S.photoTargetStage = stageId;
-  const stage = [...STAGES, ...STAGES_L, LABEL_STAGE].find(s => s.id === stageId) || null;
+  const stage = allKnownStages().find(s => s.id === stageId) || null;
   document.getElementById('cam-stage-label').textContent = stage ? stage.label : 'Photo';
   const camWrap = document.getElementById('photo-cam-wrap');
   camWrap.style.display='block';
@@ -2009,7 +2203,7 @@ function resetState(){
   S.orderNum=null; S.displayOrderNum=null; S.shipmentId=null; S.shipmentSeq=null; S.shipmentItemId=null;
   S.stages = {};
   S.isReopen=false; S.reopenCode=''; S.reopenNote=''; S.orderComment='';
-  S.isShippingLabel=false; S.isLWorkflow=false;
+  S.isShippingLabel=false; S.isLWorkflow=false; S.isRainWorkflow=false; S.rainShipType=null;
   S.photoTargetStage=null;
   const orderInput = document.getElementById('order-input');
   if(orderInput) orderInput.value='';
@@ -2265,7 +2459,7 @@ function renderRecentList(){
         ? `<span style="color:var(--amber);font-size:10px;"> (+${o.latePhotoCount} late)</span>`
         : '';
       const sid = o.shipmentId || o.orderNum;
-      const displayNum = o.orderNum.endsWith('-L') ? o.orderNum.slice(0,-2) : o.orderNum;
+      const displayNum = detectWorkflow(o.orderNum).display;
       const suffix = sid !== o.orderNum
         ? `<span style="font-family:var(--font-mono);font-size:11px;color:var(--red);margin-left:6px;">${sid.replace(o.orderNum,'').replace(/^-/,'')}</span>`
         : '';
@@ -2304,7 +2498,7 @@ async function selectRecentOrder(shipmentIdOrOrderNum){
   const startedStr = order.started ? new Date(order.started).toLocaleString() : '—';
   const completedStr = order.completed ? new Date(order.completed).toLocaleString() : '—';
 
-  const detailDisplayNum = order.orderNum.endsWith('-L') ? order.orderNum.slice(0,-2) : order.orderNum;
+  const detailDisplayNum = detectWorkflow(order.orderNum).display;
   document.getElementById('detail-header-num').textContent  = order.shipmentId || detailDisplayNum;
   document.getElementById('detail-order-num').textContent   = detailDisplayNum;
   document.getElementById('detail-shipment-id').textContent = order.shipmentId || '—';
@@ -2369,7 +2563,11 @@ async function loadOrderPhotoDetail(orderNum, shipmentId){
     }
 
     // Pick the right stage list based on order suffix
-    const detailStages = orderNum.endsWith('-L') ? STAGES_L : STAGES;
+    const _dwf = detectWorkflow(orderNum);
+    const detailStages =
+      _dwf.type==='L'  ? STAGES_L :
+      _dwf.type==='MC' ? [...STAGES_M_BUILD_CONTAINER,...STAGES_M_LOAD_CONTAINER] :
+      _dwf.type==='MT' ? [...STAGES_M_BUILD_TRAILER,...STAGES_M_LOAD_TRAILER] : STAGES;
 
     // Group by Stage
     const byStage = {};
@@ -2380,7 +2578,7 @@ async function loadOrderPhotoDetail(orderNum, shipmentId){
       byStage[sid].push(p);
     }
 
-    const allStageDefs = [...STAGES, ...STAGES_L, LABEL_STAGE];
+    const allStageDefs = allKnownStages();
     const makeThumb = (p) => {
       const isLate = p.Added_After_Completion;
       const spUrl  = p.SharePoint_URL || '#';
@@ -2431,7 +2629,7 @@ async function loadOrderPhotoDetail(orderNum, shipmentId){
     }
 
     // Surface any truly unexpected Stage values (data drift / older rows)
-    const knownIds = new Set([...STAGES.map(s=>s.id), ...STAGES_L.map(s=>s.id), 'ShippingLabel']);
+    const knownIds = new Set(allKnownStages().map(s=>s.id));
     const unknownPhotos = allPhotos.filter(p => !knownIds.has(p.Stage));
     if(unknownPhotos.length > 0){
       html += '<div style="height:8px;"></div>';
@@ -2535,8 +2733,7 @@ function startReopenFlow(){
   const order = recentState.selectedOrder;
   if(!order) return;
 
-  document.getElementById('reason-order-num').textContent =
-    order.orderNum.endsWith('-L') ? order.orderNum.slice(0,-2) : order.orderNum;
+  document.getElementById('reason-order-num').textContent = detectWorkflow(order.orderNum).display;
   const dt = new Date(order.created);
   const dateStr = dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
   document.getElementById('reason-order-meta').textContent =
@@ -2609,10 +2806,9 @@ async function confirmReopen(){
       .sort((a,b) => (a.Photo_Sequence||0) - (b.Photo_Sequence||0));
 
     // Set up state
-    const isL = order.orderNum.endsWith('-L');
-    S.orderNum         = order.orderNum;
-    S.displayOrderNum  = isL ? order.orderNum.slice(0, -2) : order.orderNum;
-    S.isLWorkflow      = isL;
+    const wf = detectWorkflow(order.orderNum);
+    S.orderNum = order.orderNum;
+    applyWorkflowState(wf);
     S.shipmentId       = order.shipmentId;
     S.shipmentSeq      = order.shipmentSeq;
     S.shipmentItemId   = order.shipmentItemId;
@@ -2695,10 +2891,9 @@ async function continueShipment(){
       .map(p => p.fields)
       .sort((a,b) => (a.Photo_Sequence||0) - (b.Photo_Sequence||0));
 
-    const isL = order.orderNum.endsWith('-L');
-    S.orderNum        = order.orderNum;
-    S.displayOrderNum = isL ? order.orderNum.slice(0,-2) : order.orderNum;
-    S.isLWorkflow     = isL;
+    const wf = detectWorkflow(order.orderNum);
+    S.orderNum = order.orderNum;
+    applyWorkflowState(wf);
     S.shipmentId      = order.shipmentId;
     S.shipmentSeq     = order.shipmentSeq;
     S.shipmentItemId  = order.shipmentItemId;
@@ -2981,11 +3176,10 @@ async function dupAddShippingLabel(){
       .sort((a,b) => (a.fields?.Photo_Sequence||0) - (b.fields?.Photo_Sequence||0));
 
     // Set up state
-    const rawOrderNum     = dupState.orderNum || s.shipmentId.split('-S')[0];
-    const isL             = rawOrderNum.endsWith('-L');
-    S.orderNum            = rawOrderNum;
-    S.displayOrderNum     = isL ? rawOrderNum.slice(0,-2) : rawOrderNum;
-    S.isLWorkflow         = isL;
+    const rawOrderNum = dupState.orderNum || s.shipmentId.split('-S')[0];
+    const wf2 = detectWorkflow(rawOrderNum);
+    S.orderNum = rawOrderNum;
+    applyWorkflowState(wf2);
     S.shipmentId          = s.shipmentId;
     S.shipmentSeq         = s.seq;
     S.shipmentItemId      = s.shipmentItemId;
@@ -3044,7 +3238,7 @@ function dupViewPrevious(){
   const dt = new Date(s.created);
   const startedStr = s.started ? new Date(s.started).toLocaleString() : '—';
   const completedStr = s.completed ? new Date(s.completed).toLocaleString() : '—';
-  const dupDisplayNum = orderNum.endsWith('-L') ? orderNum.slice(0,-2) : orderNum;
+  const dupDisplayNum = detectWorkflow(orderNum).display;
   document.getElementById('detail-header-num').textContent  = s.shipmentId;
   document.getElementById('detail-order-num').textContent   = dupDisplayNum;
   document.getElementById('detail-shipment-id').textContent = s.shipmentId;
@@ -3083,11 +3277,10 @@ async function dupAddToExisting(){
 function dupStartNew(){
   const maxSeq = dupState.shipments.reduce((m,s)=>Math.max(m, Number(s.seq)||1), 0);
 
-  const rawNum      = dupState.orderNum;
-  const isL         = rawNum.endsWith('-L');
-  S.orderNum        = rawNum;
-  S.displayOrderNum = isL ? rawNum.slice(0,-2) : rawNum;
-  S.isLWorkflow     = isL;
+  const rawNum = dupState.orderNum;
+  const wf = detectWorkflow(rawNum);
+  S.orderNum = rawNum;
+  applyWorkflowState(wf);
   S.shipmentSeq     = maxSeq + 1;
   S.shipmentId      = `${rawNum}-S${S.shipmentSeq}`;
   S.shipmentItemId  = null;
@@ -3100,10 +3293,17 @@ function dupStartNew(){
 
   closeDupDialog();
   document.getElementById('confirm-num').textContent = S.displayOrderNum || S.orderNum;
-  document.getElementById('confirm-hero-sub').textContent  = isL ? 'Work Order Number' : 'GP Order Number';
-  document.getElementById('confirm-help-text').textContent = isL
-    ? 'Confirm this order number matches your Google Sheet work order. All photos will be filed under this number.'
-    : 'Confirm this order number matches your picking ticket. All photos will be filed under this number.';
+  document.getElementById('confirm-hero-sub').textContent =
+    S.isRainWorkflow ? 'RAIN Machine Order' :
+    wf.type==='L'    ? 'Work Order Number'  : 'GP Order Number';
+  document.getElementById('confirm-help-text').textContent =
+    S.isRainWorkflow
+      ? 'This is a RAIN Machine order. Select Trailer or Container below, then tap "Confirm & Continue" to begin.'
+      : wf.type==='L'
+        ? 'Confirm this order number matches your Google Sheet work order. All photos will be filed under this number.'
+        : 'Confirm this order number matches your picking ticket. All photos will be filed under this number.';
+  const rainCard2 = document.getElementById('rain-type-card');
+  if(rainCard2) rainCard2.style.display = S.isRainWorkflow ? '' : 'none';
   showScreen('screen-confirm');
 }
 
