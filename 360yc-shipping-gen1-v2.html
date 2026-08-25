@@ -1244,7 +1244,13 @@ async function openRainOrder(shipmentId, orderNum){
     };
 
     hideOverlay();
-    showScreen('screen-detail');
+    // In-Progress RAIN orders go straight into capture — no confirmation needed.
+    // Only Shipped orders require the reopen reason flow via screen-detail.
+    if(f.Status === 'In Progress'){
+      await continueShipment();
+    } else {
+      showScreen('screen-detail');
+    }
   }catch(e){
     hideOverlay();
     console.error('openRainOrder error:', e);
