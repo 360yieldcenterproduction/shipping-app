@@ -464,6 +464,34 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <button class="btn btn-outline" onclick="showRecentOrders()" style="margin-top:0;">
       🕐 &nbsp;Recent Orders
     </button>
+    <button class="btn btn-outline" onclick="openRainDashboard()" style="margin-top:0;border-color:var(--green);color:var(--green);">
+      🌧️ &nbsp;Open RAIN Orders
+    </button>
+    <div class="bottom-safe"></div>
+  </div>
+</div>
+
+<!-- ══ RAIN ORDERS DASHBOARD ══ -->
+<div id="screen-rain-orders" class="screen">
+  <div class="app-header">
+    <div class="h-left">
+      <button class="back-btn" onclick="goBack('screen-scan')">← Back</button>
+      <div class="h-sub" style="color:rgba(255,255,255,0.7);">Open RAIN Orders</div>
+    </div>
+    <div class="h-right">
+      <button class="btn-icon" title="Refresh" onclick="loadRainDashboard()">↻</button>
+      <div class="user-chip"><div class="user-av" id="av-rain"></div><div class="user-name" id="nm-rain"></div></div>
+    </div>
+  </div>
+  <div class="screen-body">
+    <div class="card" style="padding:10px 14px;border-left:3px solid var(--green);">
+      <p style="font-size:12px;color:var(--text-dim);line-height:1.5;">
+        In Progress orders + orders shipped within the last 3 days. Tap any row to open it.
+      </p>
+    </div>
+    <div id="rain-orders-list">
+      <div class="empty-state"><div class="empty-icon">⏳</div>Loading…</div>
+    </div>
     <div class="bottom-safe"></div>
   </div>
 </div>
@@ -1059,6 +1087,172 @@ function parseCSVRow(line){
   out.push(cur);
   return out;
 }
+
+// Infer RAIN ship type from photo stage IDs (fallback for orders stored without suffix).
+function inferRainTypeFromPhotos(photos){
+  for(const p of photos){
+    const sid = String(p.Stage||'');
+    if(sid.startsWith('M_C')) return 'Container';
+    if(sid.startsWith('M_T')) return 'Trailer';
+  }
+  return null;
+}
+
+// ── RAIN Orders Dashboard ────────────────────────────────────────────────────
+
+// Fetch the published CSV and build a map: { "ORDR00050688": {workOrder:"2027-01", dealer:"Acme"} }
+async function fetchRainSheetMap(){
+  const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRyTgWYqxTowKZALIFQ4MAotGIu3N7llTWPTHdVncba-7-pRN7lAWRovFTzD4RXrXO19D9Vaw4ejfyM/pub?gid=0&single=true&output=csv';
+  try{
+    const res = await fetch(CSV_URL);
+    if(!res.ok) return {};
+    const text = await res.text();
+    const map = {};
+    text.split('\n').forEach((line, idx) => {
+      if(idx === 0) return; // skip header
+      const cols = parseCSVRow(line);
+      const key = String(cols[10]||'').trim().toUpperCase(); // col K = base ORDR
+      if(key){
+        map[key] = {
+          workOrder: String(cols[0]||'').trim(),   // col A
+          dealer:    String(cols[5]||'').trim(),   // col F
+        };
+      }
+    });
+    return map;
+  }catch(e){
+    console.warn('fetchRainSheetMap failed:', e);
+    return {};
+  }
+}
+
+async function openRainDashboard(){
+  // Sync avatar/name from current session state
+  const avEl = document.getElementById('av-rain');
+  const nmEl = document.getElementById('nm-rain');
+  if(avEl && S.userName){ avEl.textContent = S.userName.charAt(0).toUpperCase(); }
+  if(nmEl && S.userName){ nmEl.textContent = S.userName.split(' ')[0]; }
+  showScreen('screen-rain-orders');
+  await loadRainDashboard();
+}
+
+async function loadRainDashboard(){
+  const listEl = document.getElementById('rain-orders-list');
+  if(listEl) listEl.innerHTML = '<div class="empty-state"><div class="empty-icon">⏳</div>Loading…</div>';
+  try{
+    const token = await getToken();
+    await ensureSpIds(token);
+
+    // Fetch all RAIN shipments (-MC and -MT suffixes)
+    // We use OR filter: status in (In Progress, Shipped) and orderNum ends with -MC or -MT
+    // SharePoint doesn't support endsWith, so we fetch recent and filter client-side.
+    const cutoff = new Date(Date.now() - 3*24*60*60*1000).toISOString(); // 3 days ago
+    const filterExpr = `fields/Status ne 'Cancelled'`;
+    const url = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listShipments}/items`+
+      `?$expand=fields&$filter=${encodeURIComponent(filterExpr)}&$top=500&$orderby=fields/Created desc`;
+
+    const res = await fetch(url, {
+      headers:{ Authorization:`Bearer ${token}`, Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly' }
+    });
+    if(!res.ok) throw new Error(`SP fetch failed: ${res.status}`);
+    const data = await res.json();
+
+    const now = Date.now();
+    const cutoffMs = now - 3*24*60*60*1000;
+
+    const rainOrders = (data.value||[])
+      .map(i => i.fields)
+      .filter(f => {
+        const num = String(f.GP_Order_Number||'');
+        return num.endsWith('-MC') || num.endsWith('-MT');
+      })
+      .filter(f => {
+        if(f.Status === 'Shipped'){
+          const shipped = new Date(f.Shipped_Date || f.Modified).getTime();
+          return shipped >= cutoffMs;
+        }
+        return f.Status !== 'Cancelled';
+      });
+
+    const sheetMap = await fetchRainSheetMap();
+    renderRainDashboard(rainOrders, sheetMap);
+  }catch(e){
+    console.error('loadRainDashboard error:', e);
+    const listEl = document.getElementById('rain-orders-list');
+    if(listEl) listEl.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><div>${e.message}</div></div>`;
+  }
+}
+
+function renderRainDashboard(orders, sheetMap){
+  const listEl = document.getElementById('rain-orders-list');
+  if(!listEl) return;
+  if(!orders.length){
+    listEl.innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div><div>No open RAIN orders</div></div>';
+    return;
+  }
+  listEl.innerHTML = orders.map(f => {
+    const orderNum = String(f.GP_Order_Number||'');
+    const base     = orderNum.replace(/-MC$|-MT$/, '').substring(0,12).toUpperCase();
+    const sheet    = sheetMap[base] || {};
+    const workOrder  = sheet.workOrder || '—';
+    const dealer     = sheet.dealer    || '—';
+    const type       = orderNum.endsWith('-MC') ? '🚢 Container' : '🚛 Trailer';
+    const status     = f.Status || 'In Progress';
+    const statusClr  = status === 'Shipped' ? 'var(--text-muted)' : 'var(--green)';
+    const shipId     = f.Shipment_ID || '';
+    const displayNum = orderNum.slice(0, orderNum.lastIndexOf('-'));
+    return `<div class="card" style="padding:12px 14px;margin-bottom:8px;cursor:pointer;border-left:3px solid var(--green);"
+                 onclick="openRainOrder('${shipId}','${orderNum}')">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+        <div style="font-weight:600;font-size:15px;">${workOrder} — ${dealer}</div>
+        <div style="font-size:11px;color:${statusClr};white-space:nowrap;">${status}</div>
+      </div>
+      <div style="font-size:12px;color:var(--text-dim);margin-top:3px;">${type} &nbsp;·&nbsp; ${displayNum}</div>
+    </div>`;
+  }).join('');
+}
+
+async function openRainOrder(shipmentId, orderNum){
+  if(!shipmentId || !orderNum){ toast('Cannot open — missing data','err'); return; }
+  showOverlay('Loading order…');
+  try{
+    const token = await getToken();
+    await ensureSpIds(token);
+
+    // Fetch the shipment record
+    const filterExpr = `fields/Shipment_ID eq '${shipmentId.replace(/'/g,"''")}'`;
+    const url = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listShipments}/items`+
+      `?$expand=fields&$filter=${encodeURIComponent(filterExpr)}&$top=2`;
+    const res = await fetch(url, {
+      headers:{ Authorization:`Bearer ${token}`, Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly' }
+    });
+    if(!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+    const data = await res.json();
+    const item = (data.value||[])[0];
+    if(!item) throw new Error('Shipment not found');
+
+    const f = item.fields;
+    recentState.selectedOrder = {
+      shipmentId:   f.Shipment_ID,
+      shipmentSeq:  f.Shipment_Seq,
+      shipmentItemId: item.id,
+      orderNum:     f.GP_Order_Number,
+      status:       f.Status,
+      comment:      f.Order_Comment||'',
+      carrier:      f.Carrier||'',
+      trackingNum:  f.Tracking_Number||'',
+    };
+
+    hideOverlay();
+    showScreen('screen-detail');
+  }catch(e){
+    hideOverlay();
+    console.error('openRainOrder error:', e);
+    toast('Could not open order: '+e.message,'err');
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 // Checks Brent's RAIN Machine Data sheet (column K = base ORDR number).
 // Returns true if the scanned order number matches any row → routes as RAIN order.
@@ -2840,6 +3034,12 @@ async function confirmReopen(){
     // entries in `photos` so the user sees what's already there. Each
     // saved photo's dataUrl is the SharePoint URL — we'll let the camera
     // add NEW dataUrls past savedCount.
+    // Fallback: infer RAIN type from photo stage IDs if suffix wasn't in stored order number
+    if(!S.isRainWorkflow){
+      const inferred = inferRainTypeFromPhotos(photos);
+      if(inferred){ S.isRainWorkflow=true; S.rainShipType=inferred; S.stages=emptyStages(); }
+    }
+
     for(const p of photos){
       const sid = p.Stage;
       if(!S.stages[sid]) continue;
@@ -2920,6 +3120,12 @@ async function continueShipment(){
     S.reopenNote      = '';
     S.orderComment    = order.comment || '';
     S.stages          = emptyStages();
+
+    // Fallback: infer RAIN type from photo stage IDs if suffix wasn't in stored order number
+    if(!S.isRainWorkflow){
+      const inferred = inferRainTypeFromPhotos(photos);
+      if(inferred){ S.isRainWorkflow=true; S.rainShipType=inferred; S.stages=emptyStages(); }
+    }
 
     for(const p of photos){
       const sid = p.Stage;
