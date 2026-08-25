@@ -1285,8 +1285,55 @@ function emptyStages(stagesArr){
   const out = {};
   for(const s of arr){
     out[s.id] = { photos:[], savedCount:0, savedUrls:[], na:false };
+    if(s.id === 'M_CLifts') out[s.id].lifts = [];
   }
   return out;
+}
+
+function syncLiftPhotos(st){
+  st.photos = (st.lifts||[]).flatMap(l => l.photos);
+}
+
+function collectNewPhotos(stages){
+  const out = [];
+  for(const stage of stages){
+    const st = S.stages[stage.id];
+    if(!st || st.na) continue;
+    if(stage.id === 'M_CLifts'){
+      for(const lift of (st.lifts||[])){
+        for(let i = lift.savedCount; i < lift.photos.length; i++){
+          out.push({stageId:`M_CLifts_${lift.num}`, dataUrl:lift.photos[i], sequence:i+1, _lift:lift});
+        }
+      }
+    } else {
+      for(let i = st.savedCount; i < st.photos.length; i++){
+        out.push({stageId:stage.id, dataUrl:st.photos[i], sequence:i+1});
+      }
+    }
+  }
+  return out;
+}
+
+function addLiftFromInput(){
+  const input = document.getElementById('new-lift-num');
+  const num = input ? input.value.trim() : '';
+  if(!num){ toast('Enter a lift number first','err'); return; }
+  const st = S.stages['M_CLifts'];
+  if(!st) return;
+  if(st.lifts.some(l => l.num === num)){ toast(`Lift #${num} already added`,'err'); return; }
+  st.lifts.push({num, photos:[], savedCount:0});
+  syncLiftPhotos(st);
+  if(input) input.value = '';
+  renderCaptureScreen();
+}
+
+function removeLift(liftIdx){
+  const st = S.stages['M_CLifts'];
+  if(!st || !st.lifts[liftIdx]) return;
+  if(st.lifts[liftIdx].savedCount > 0){ toast('Cannot remove a lift that already has saved photos','err'); return; }
+  st.lifts.splice(liftIdx, 1);
+  syncLiftPhotos(st);
+  renderCaptureScreen();
 }
 
 // ═══════════════════════════════════════════════════
@@ -1778,6 +1825,62 @@ function renderCaptureScreen(){
     const isNA    = st.na === true;
     const hasClass= count > 0 ? ' has-photos' : (isNA ? ' is-na' : '');
 
+    // ── Special rendering for Lift Photos ────────────────────────────────────
+    if(stage.id === 'M_CLifts' && !isNA){
+      const lifts = st.lifts || [];
+      const totalPh = lifts.reduce((s,l)=>s+l.photos.length,0);
+      const liftCards = lifts.map((lift, li) => {
+        const liftGrid = lift.photos.length === 0 ? '' : `
+          <div class="photo-grid" style="margin-bottom:6px;">
+            ${lift.photos.map((src,pi)=>{
+              const isSaved = pi < lift.savedCount;
+              const rmBtn = isSaved
+                ? `<button class="thumb-rm" disabled title="Already saved">✓</button>`
+                : `<button class="thumb-rm" onclick="removeStagePhoto('M_CLifts:${li}',${pi})">✕</button>`;
+              return `<div class="photo-thumb"><img src="${src}" loading="lazy"/>${rmBtn}<div class="thumb-label">Lift #${lift.num} (${pi+1})${isSaved?' ✓':''}</div></div>`;
+            }).join('')}
+          </div>`;
+        const canRemove = lift.savedCount === 0 && lift.photos.length === 0;
+        return `<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <div style="font-weight:600;font-size:14px;">Lift #${lift.num}</div>
+            ${canRemove ? `<button class="btn-na" onclick="removeLift(${li})" style="font-size:11px;padding:3px 8px;">✕ Remove</button>` : `<span style="font-size:12px;color:var(--text-muted);">${lift.photos.length} photo${lift.photos.length!==1?'s':''}</span>`}
+          </div>
+          ${liftGrid}
+          <div style="display:flex;gap:7px;">
+            <button class="btn btn-outline btn-sm" onclick="openPhotoCamera('M_CLifts:${li}')" style="flex:1;">📷&nbsp;Camera</button>
+            <button class="btn btn-outline btn-sm" onclick="openPhotoUpload('M_CLifts:${li}')" style="flex:1;">📁&nbsp;Upload</button>
+          </div>
+        </div>`;
+      }).join('');
+
+      const addRow = `<div style="display:flex;gap:8px;align-items:center;margin-top:${lifts.length>0?'4px':'0'};">
+        <input type="number" id="new-lift-num" placeholder="Lift #" min="1" max="99"
+               style="width:80px;text-align:center;padding:8px;border:1.5px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font-size:14px;"
+               onkeydown="if(event.key==='Enter')addLiftFromInput()"/>
+        <button class="btn btn-outline btn-sm" onclick="addLiftFromInput()" style="flex:1;">+ Add Lift</button>
+      </div>`;
+
+      const naBtn = `<button class="btn-na${lifts.length>0?' ':''}" onclick="toggleStageNA('M_CLifts')" style="margin-top:10px;">Mark as N/A</button>`;
+
+      return `<div class="stage-card${hasClass}" id="stage-card-${stage.id}">
+        <div class="stage-card-header">
+          <div>
+            <span class="stage-card-num">${idx+1}.</span>
+            <span class="stage-card-title">${stage.icon} &nbsp;${stage.label}</span>
+          </div>
+          <div class="stage-card-status">
+            <span class="stage-card-count">${lifts.length} lift${lifts.length!==1?'s':''}, ${totalPh} photo${totalPh!==1?'s':''}</span>
+          </div>
+        </div>
+        <div class="stage-card-body">
+          <div class="stage-help">${stage.help}</div>
+          ${liftCards}${addRow}${naBtn}
+        </div>
+      </div>`;
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     const grid = count === 0 ? '' : `
       <div class="photo-grid">
         ${st.photos.map((src,i)=>{
@@ -1917,17 +2020,25 @@ function openPhotoUpload(stageId){
 
 async function handlePhotoUpload(evt){
   const stageId = uploadTargetStage;
-  if(!stageId || !S.stages[stageId]) return;
+  if(!stageId) return;
   const files = Array.from(evt.target.files);
   if(!files.length) return;
-  for(const file of files){
-    const dataUrl = await new Promise((res,rej)=>{
-      const r = new FileReader();
-      r.onload = e => res(e.target.result);
-      r.onerror = rej;
-      r.readAsDataURL(file);
-    });
-    S.stages[stageId].photos.push(dataUrl);
+
+  if(stageId.startsWith('M_CLifts:')){
+    const li = parseInt(stageId.split(':')[1]);
+    const st = S.stages['M_CLifts'];
+    if(!st || !st.lifts[li]) return;
+    for(const file of files){
+      const dataUrl = await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=e=>res(e.target.result); r.onerror=rej; r.readAsDataURL(file); });
+      st.lifts[li].photos.push(dataUrl);
+    }
+    syncLiftPhotos(st);
+  } else {
+    if(!S.stages[stageId]) return;
+    for(const file of files){
+      const dataUrl = await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=e=>res(e.target.result); r.onerror=rej; r.readAsDataURL(file); });
+      S.stages[stageId].photos.push(dataUrl);
+    }
   }
   renderCaptureScreen();
   toast(`${files.length} photo${files.length!==1?'s':''} added`,'ok');
@@ -1935,8 +2046,15 @@ async function handlePhotoUpload(evt){
 
 async function openPhotoCamera(stageId){
   S.photoTargetStage = stageId;
-  const stage = allKnownStages().find(s => s.id === stageId) || null;
-  document.getElementById('cam-stage-label').textContent = stage ? stage.label : 'Photo';
+  const baseId = stageId.includes(':') ? stageId.split(':')[0] : stageId;
+  const stage = allKnownStages().find(s => s.id === baseId) || null;
+  let camLabel = stage ? stage.label : 'Photo';
+  if(stageId.includes(':')){
+    const li = parseInt(stageId.split(':')[1]);
+    const st = S.stages['M_CLifts'];
+    if(st && st.lifts[li]) camLabel = `Lift #${st.lifts[li].num}`;
+  }
+  document.getElementById('cam-stage-label').textContent = camLabel;
   const camWrap = document.getElementById('photo-cam-wrap');
   camWrap.style.display='block';
   const video=document.getElementById('photo-video');
@@ -1966,16 +2084,32 @@ function capturePhoto(){
   stopPhotoCamera();
 
   const stageId = S.photoTargetStage;
-  if(!stageId || !S.stages[stageId]){
-    toast('Stage not found','err'); return;
+  if(stageId && stageId.startsWith('M_CLifts:')){
+    const li = parseInt(stageId.split(':')[1]);
+    const st = S.stages['M_CLifts'];
+    if(!st || !st.lifts[li]){ toast('Lift not found','err'); return; }
+    st.lifts[li].photos.push(dataUrl);
+    syncLiftPhotos(st);
+  } else {
+    if(!stageId || !S.stages[stageId]){ toast('Stage not found','err'); return; }
+    S.stages[stageId].photos.push(dataUrl);
   }
-  S.stages[stageId].photos.push(dataUrl);
-
   renderCaptureScreen();
   toast('Photo captured','ok');
 }
 
 function removeStagePhoto(stageId, idx){
+  if(stageId && stageId.startsWith('M_CLifts:')){
+    const li = parseInt(stageId.split(':')[1]);
+    const st = S.stages['M_CLifts'];
+    if(!st || !st.lifts[li]) return;
+    const lift = st.lifts[li];
+    if(idx < lift.savedCount){ toast('Saved photos cannot be removed from the app','err'); return; }
+    lift.photos.splice(idx, 1);
+    syncLiftPhotos(st);
+    renderCaptureScreen();
+    return;
+  }
   const st = S.stages[stageId];
   if(!st) return;
   if(idx < st.savedCount){
@@ -1983,8 +2117,6 @@ function removeStagePhoto(stageId, idx){
     return;
   }
   st.photos.splice(idx,1);
-  // savedUrls follows photos — only the unsaved tail is removed; nothing
-  // to delete in savedUrls because saved photos are at the front.
   renderCaptureScreen();
 }
 
@@ -2043,14 +2175,17 @@ async function submitShipment(){
     return;
   }
 
-  const newPhotos = []; // [{stageId, dataUrl, sequence}]
-  for(const stage of stages){
-    const st = S.stages[stage.id];
-    if(!st || st.na) continue;
-    for(let i=st.savedCount; i<st.photos.length; i++){
-      newPhotos.push({stageId: stage.id, dataUrl: st.photos[i], sequence: i+1});
+  // Validate that every added lift has at least one photo
+  const liftSt = S.stages['M_CLifts'];
+  if(liftSt && !liftSt.na){
+    const emptyLifts = (liftSt.lifts||[]).filter(l => l.photos.length === 0);
+    if(emptyLifts.length > 0){
+      toast(`Lift${emptyLifts.length>1?'s':''} #${emptyLifts.map(l=>l.num).join(', #')} need at least 1 photo`,'err');
+      return;
     }
   }
+
+  const newPhotos = collectNewPhotos(stages);
 
   const commentEl = document.getElementById('order-comment');
   S.orderComment = (commentEl?.value || '').trim().slice(0,100);
@@ -2097,8 +2232,8 @@ async function submitShipment(){
       }
 
       // Mark as saved locally so a retry won't re-upload it
-      const st = S.stages[p.stageId];
-      st.savedCount = Math.max(st.savedCount, p.sequence);
+      if(p._lift){ p._lift.savedCount = Math.max(p._lift.savedCount, p.sequence); syncLiftPhotos(S.stages['M_CLifts']); }
+      else { const st = S.stages[p.stageId]; st.savedCount = Math.max(st.savedCount, p.sequence); }
       done++;
     }
 
@@ -2149,14 +2284,7 @@ async function submitShipment(){
 // ═══════════════════════════════════════════════════
 async function saveForLater(){
   const stages = activeStages();
-  const newPhotos = [];
-  for(const stage of stages){
-    const st = S.stages[stage.id];
-    if(!st || st.na) continue;
-    for(let i = st.savedCount; i < st.photos.length; i++){
-      newPhotos.push({stageId: stage.id, dataUrl: st.photos[i], sequence: i+1});
-    }
-  }
+  const newPhotos = collectNewPhotos(stages);
 
   if(newPhotos.length === 0){
     // Nothing new to upload — just leave (Shipments row already exists as In Progress)
@@ -2199,8 +2327,8 @@ async function saveForLater(){
         Is_Deleted:             false,
       });
 
-      const st = S.stages[p.stageId];
-      st.savedCount = Math.max(st.savedCount, p.sequence);
+      if(p._lift){ p._lift.savedCount = Math.max(p._lift.savedCount, p.sequence); syncLiftPhotos(S.stages['M_CLifts']); }
+      else { const st = S.stages[p.stageId]; st.savedCount = Math.max(st.savedCount, p.sequence); }
       done++;
     }
 
@@ -3048,11 +3176,19 @@ async function confirmReopen(){
 
     for(const p of photos){
       const sid = p.Stage;
+      if(sid && sid.startsWith('M_CLifts_')){
+        const liftNum = sid.slice('M_CLifts_'.length);
+        const st = S.stages['M_CLifts'];
+        if(st){
+          let lift = st.lifts.find(l => l.num === liftNum);
+          if(!lift){ lift = {num:liftNum, photos:[], savedCount:0}; st.lifts.push(lift); }
+          lift.photos.push(p.SharePoint_URL || '');
+          lift.savedCount++;
+          syncLiftPhotos(st);
+        }
+        continue;
+      }
       if(!S.stages[sid]) continue;
-      // Use SharePoint web URL as src — won't render directly without
-      // bearer-token thumbnail fetch, but renderCaptureScreen draws an
-      // <img> tag and the user just sees a broken-image fallback.
-      // Better: show a small "saved" placeholder block instead.
       S.stages[sid].photos.push(p.SharePoint_URL || '');
       S.stages[sid].savedUrls.push(p.SharePoint_URL || '');
       S.stages[sid].savedCount++;
@@ -3135,6 +3271,18 @@ async function continueShipment(){
 
     for(const p of photos){
       const sid = p.Stage;
+      if(sid && sid.startsWith('M_CLifts_')){
+        const liftNum = sid.slice('M_CLifts_'.length);
+        const st = S.stages['M_CLifts'];
+        if(st){
+          let lift = st.lifts.find(l => l.num === liftNum);
+          if(!lift){ lift = {num:liftNum, photos:[], savedCount:0}; st.lifts.push(lift); }
+          lift.photos.push(p.SharePoint_URL || '');
+          lift.savedCount++;
+          syncLiftPhotos(st);
+        }
+        continue;
+      }
       if(!S.stages[sid]) continue;
       S.stages[sid].photos.push(p.SharePoint_URL || '');
       S.stages[sid].savedUrls.push(p.SharePoint_URL || '');
