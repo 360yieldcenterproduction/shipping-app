@@ -1044,19 +1044,36 @@ function applyWorkflowState(wf){
   S.displayOrderNum = wf.display;
 }
 
+// Parses one line of CSV, handling quoted fields that contain commas.
+function parseCSVRow(line){
+  const out = []; let cur = '', inQ = false;
+  for(let i = 0; i < line.length; i++){
+    const c = line[i];
+    if(c === '"'){
+      if(inQ && line[i+1] === '"'){ cur += '"'; i++; }
+      else inQ = !inQ;
+    } else if(c === ',' && !inQ){
+      out.push(cur); cur = '';
+    } else { cur += c; }
+  }
+  out.push(cur);
+  return out;
+}
+
 // Checks Brent's RAIN Machine Data sheet (column K = base ORDR number).
 // Returns true if the scanned order number matches any row → routes as RAIN order.
+// Uses a published CSV URL — no API key required.
 async function checkRainSheet(orderNum){
-  const SHEET_ID = '1HMJALr3n8CHIh4dq9oed7QYstJaecrQxRapujgsZ53g';
-  const API_KEY  = 'AIzaSyCDyzrgfKWXAqvrz-eLFYNiEVI1W8XQ-2Q';
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Machine%20Data!A:K?key=${API_KEY}`;
+  const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRyTgWYqxTowKZALIFQ4MAotGIu3N7llTWPTHdVncba-7-pRN7lAWRovFTzD4RXrXO19D9Vaw4ejfyM/pub?gid=0&single=true&output=csv';
   try{
-    const res = await fetch(url);
+    const res = await fetch(CSV_URL);
     if(!res.ok) return false;
-    const data = await res.json();
-    const rows = data.values || [];
+    const text = await res.text();
     const target = orderNum.substring(0,12).toUpperCase().trim();
-    return rows.some(row => String(row[10]||'').trim().toUpperCase() === target);
+    return text.split('\n').some(line => {
+      const cols = parseCSVRow(line);
+      return String(cols[10]||'').trim().toUpperCase() === target;
+    });
   }catch(e){
     console.warn('RAIN sheet check failed — defaulting to standard workflow:', e);
     return false;
