@@ -2435,7 +2435,14 @@ async function saveForLater(){
   const newPhotos = collectNewPhotos(stages);
 
   if(newPhotos.length === 0){
-    // Nothing new to upload — just leave (Shipments row already exists as In Progress)
+    // Nothing new to upload — but still persist lift tags if they changed
+    if(S.shipmentItemId){
+      const liftTagsJson = collectLiftTags();
+      if(liftTagsJson){
+        try{ await spPatchListItem(await getToken(), CFG.listShipments, S.shipmentItemId, { Lift_Tags: liftTagsJson }); }
+        catch(e){ console.warn('Lift_Tags save failed (non-fatal):', e.message); }
+      }
+    }
     toast('Progress saved — find this order in Recent Orders to continue','ok');
     resetState();
     showScreen('screen-scan');
