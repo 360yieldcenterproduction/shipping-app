@@ -149,6 +149,12 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 }
 .btn-na:hover{border-color:var(--text-muted);color:var(--text);}
 .btn-na.active{background:var(--gray-mid);color:var(--text);border-style:solid;}
+.lift-tag-chip{
+  display:inline-block;padding:4px 10px;border-radius:20px;font-size:11px;
+  border:1.5px solid var(--border);cursor:pointer;margin:3px 3px 0 0;
+  color:var(--text);background:var(--surface);user-select:none;
+}
+.lift-tag-chip.active{background:var(--green);color:#fff;border-color:var(--green);}
 .section-header-l{
   font-family:var(--font-cond);font-size:10px;font-weight:900;letter-spacing:0.08em;
   text-transform:uppercase;color:var(--text-muted);padding:4px 0 8px;
@@ -931,6 +937,14 @@ const STAGES_L = [
    help:'One photo per page of the GP picking ticket.'},
   {id:'AuditSheet',    label:'Audit Sheet',             icon:'📝', canSkip:false,
    help:'One photo per page of the completed audit sheet.'},
+];
+
+// ── LIFT TAGS (predefined list for container lifts) ──────────────────────────
+const LIFT_TAGS = [
+  'Boom Extension','Booms','Crate','Dispenser','Drop Assembly(s)',
+  'Fan Drops','Fertilizer Pump','Front Drop Assembly(s)','Front Leg Pallet',
+  'Fuel Tanks','Hose Coil','Machine & Frame','Panel','Pontoon',
+  'Skid','Tire','Wheel Shield / Dispenser Shield','Wire',
 ];
 
 // ── RAIN MACHINE WORKFLOW ─────────────────────────────────────────────────────
