@@ -1330,24 +1330,98 @@ function collectNewPhotos(stages){
   return out;
 }
 
+// ── Lift form transient state ─────────────────────────────────────────────────
+let _liftFormOpen     = false;
+let _newLiftTags      = [];
+let _newLiftOtherOn   = false;
+let _newLiftOtherText = '';
+
+function openAddLiftForm(){
+  _liftFormOpen = true; _newLiftTags = []; _newLiftOtherOn = false; _newLiftOtherText = '';
+  renderCaptureScreen();
+  setTimeout(()=>{ const el=document.getElementById('new-lift-num'); if(el) el.focus(); }, 60);
+}
+
+function cancelAddLiftForm(){
+  _liftFormOpen = false;
+  renderCaptureScreen();
+}
+
 function addLiftFromInput(){
-  const input = document.getElementById('new-lift-num');
-  const num = input ? input.value.trim() : '';
-  if(!num){ toast('Enter a lift number first','err'); return; }
+  const numEl = document.getElementById('new-lift-num');
+  const num = numEl ? numEl.value.trim() : '';
+  if(!num){ toast('Enter a lift number','err'); return; }
   const st = S.stages['M_CLifts'];
   if(!st) return;
   if(st.lifts.some(l => l.num === num)){ toast(`Lift #${num} already added`,'err'); return; }
-  st.lifts.push({num, photos:[], savedCount:0});
+  const tags = [..._newLiftTags];
+  if(_newLiftOtherOn){
+    const inp = document.getElementById('new-lift-other-input');
+    const txt = (inp ? inp.value : _newLiftOtherText).trim();
+    if(txt) tags.push('Other: ' + txt);
+  }
+  st.lifts.push({num, tags, photos:[], savedCount:0});
   syncLiftPhotos(st);
-  if(input) input.value = '';
+  _liftFormOpen = false; _newLiftTags = []; _newLiftOtherOn = false; _newLiftOtherText = '';
   renderCaptureScreen();
+}
+
+// Predefined tag toggle on new-lift form — DOM-only, no re-render
+function toggleNewLiftTag(tagIdx, el){
+  const tag = LIFT_TAGS[tagIdx];
+  const i = _newLiftTags.indexOf(tag);
+  if(i===-1){ _newLiftTags.push(tag); el.classList.add('active'); }
+  else { _newLiftTags.splice(i,1); el.classList.remove('active'); }
+}
+function toggleNewLiftOther(el){
+  _newLiftOtherOn = !_newLiftOtherOn;
+  el.classList.toggle('active', _newLiftOtherOn);
+  const wrap = document.getElementById('new-lift-other-wrap');
+  if(wrap){ wrap.style.display = _newLiftOtherOn ? 'block' : 'none'; if(_newLiftOtherOn){ const inp=wrap.querySelector('input'); if(inp) inp.focus(); } }
+}
+
+// Tag toggle on existing lift — DOM-only, no re-render
+function toggleLiftTag(liftIdx, tagIdx, el){
+  const tag = LIFT_TAGS[tagIdx];
+  const st = S.stages['M_CLifts'];
+  if(!st||!st.lifts[liftIdx]) return;
+  const lift = st.lifts[liftIdx];
+  if(!lift.tags) lift.tags=[];
+  const i = lift.tags.indexOf(tag);
+  if(i===-1){ lift.tags.push(tag); el.classList.add('active'); }
+  else { lift.tags.splice(i,1); el.classList.remove('active'); }
+}
+function toggleLiftOther(liftIdx, el){
+  const st = S.stages['M_CLifts'];
+  if(!st||!st.lifts[liftIdx]) return;
+  const lift = st.lifts[liftIdx];
+  if(!lift.tags) lift.tags=[];
+  const hasOther = lift.tags.some(t=>t.startsWith('Other: '));
+  const wrap = document.getElementById('lift-other-wrap-'+liftIdx);
+  if(hasOther){
+    lift.tags = lift.tags.filter(t=>!t.startsWith('Other: '));
+    el.classList.remove('active');
+    if(wrap) wrap.style.display='none';
+  } else {
+    el.classList.add('active');
+    if(wrap){ wrap.style.display='block'; const inp=wrap.querySelector('input'); if(inp) inp.focus(); }
+  }
+}
+function saveLiftOtherText(liftIdx){
+  const st = S.stages['M_CLifts'];
+  if(!st||!st.lifts[liftIdx]) return;
+  const lift = st.lifts[liftIdx];
+  if(!lift.tags) lift.tags=[];
+  const inp = document.getElementById('lift-other-input-'+liftIdx);
+  lift.tags = lift.tags.filter(t=>!t.startsWith('Other: '));
+  if(inp && inp.value.trim()) lift.tags.push('Other: '+inp.value.trim());
 }
 
 function removeLift(liftIdx){
   const st = S.stages['M_CLifts'];
-  if(!st || !st.lifts[liftIdx]) return;
+  if(!st||!st.lifts[liftIdx]) return;
   if(st.lifts[liftIdx].savedCount > 0){ toast('Cannot remove a lift that already has saved photos','err'); return; }
-  st.lifts.splice(liftIdx, 1);
+  st.lifts.splice(liftIdx,1);
   syncLiftPhotos(st);
   renderCaptureScreen();
 }
@@ -1843,11 +1917,17 @@ function renderCaptureScreen(){
 
     // ── Special rendering for Lift Photos ────────────────────────────────────
     if(stage.id === 'M_CLifts' && !isNA){
-      const lifts = st.lifts || [];
+      const lifts   = st.lifts || [];
       const totalPh = lifts.reduce((s,l)=>s+l.photos.length,0);
+      const inpStyle= `width:100%;padding:8px;border:1.5px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font-size:14px;box-sizing:border-box;`;
+
       const liftCards = lifts.map((lift, li) => {
+        const tags = lift.tags || [];
+        const otherTag = tags.find(t=>t.startsWith('Other: '));
+        const otherText = otherTag ? otherTag.slice(7) : '';
+
         const liftGrid = lift.photos.length === 0 ? '' : `
-          <div class="photo-grid" style="margin-bottom:6px;">
+          <div class="photo-grid" style="margin-bottom:8px;">
             ${lift.photos.map((src,pi)=>{
               const isSaved = pi < lift.savedCount;
               const rmBtn = isSaved
@@ -1856,28 +1936,58 @@ function renderCaptureScreen(){
               return `<div class="photo-thumb"><img src="${src}" loading="lazy"/>${rmBtn}<div class="thumb-label">Lift #${lift.num} (${pi+1})${isSaved?' ✓':''}</div></div>`;
             }).join('')}
           </div>`;
+
+        const tagChips = LIFT_TAGS.map((t,ti)=>
+          `<span class="lift-tag-chip${tags.includes(t)?' active':''}" onclick="toggleLiftTag(${li},${ti},this)">${t}</span>`
+        ).join('');
+        const otherChip = `<span class="lift-tag-chip${otherTag?' active':''}" id="lift-other-chip-${li}" onclick="toggleLiftOther(${li},this)">Other (Freeform)</span>`;
+        const otherWrap = `<div id="lift-other-wrap-${li}" style="display:${otherTag?'block':'none'};margin-top:6px;">
+          <input type="text" id="lift-other-input-${li}" placeholder="Describe this lift…" value="${otherText.replace(/"/g,'&quot;')}" style="${inpStyle}" oninput="saveLiftOtherText(${li})"/>
+        </div>`;
+        const tagSummary = tags.length ? `<div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:3px;">${tags.map(t=>`<span style="font-size:10px;padding:2px 7px;border-radius:12px;background:var(--green);color:#fff;">${t.startsWith('Other: ')?t.slice(7):t}</span>`).join('')}</div>` : '';
         const canRemove = lift.savedCount === 0 && lift.photos.length === 0;
+
         return `<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-            <div style="font-weight:600;font-size:14px;">Lift #${lift.num}</div>
-            ${canRemove ? `<button class="btn-na" onclick="removeLift(${li})" style="font-size:11px;padding:3px 8px;">✕ Remove</button>` : `<span style="font-size:12px;color:var(--text-muted);">${lift.photos.length} photo${lift.photos.length!==1?'s':''}</span>`}
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+            <div><div style="font-weight:600;font-size:14px;">Lift #${lift.num}</div>${tagSummary}</div>
+            ${canRemove
+              ? `<button class="btn-na" onclick="removeLift(${li})" style="font-size:11px;padding:3px 8px;margin-top:0;width:auto;">✕ Remove</button>`
+              : `<span style="font-size:12px;color:var(--text-muted);white-space:nowrap;">${lift.photos.length} photo${lift.photos.length!==1?'s':''}</span>`}
           </div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Tags (optional)</div>
+          <div>${tagChips}${otherChip}</div>
+          ${otherWrap}
           ${liftGrid}
-          <div style="display:flex;gap:7px;">
+          <div style="display:flex;gap:7px;margin-top:8px;">
             <button class="btn btn-outline btn-sm" onclick="openPhotoCamera('M_CLifts:${li}')" style="flex:1;">📷&nbsp;Camera</button>
             <button class="btn btn-outline btn-sm" onclick="openPhotoUpload('M_CLifts:${li}')" style="flex:1;">📁&nbsp;Upload</button>
           </div>
         </div>`;
       }).join('');
 
-      const addRow = `<div style="display:flex;gap:8px;align-items:center;margin-top:${lifts.length>0?'4px':'0'};">
-        <input type="number" id="new-lift-num" placeholder="Lift #" min="1" max="99"
-               style="width:80px;text-align:center;padding:8px;border:1.5px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font-size:14px;"
-               onkeydown="if(event.key==='Enter')addLiftFromInput()"/>
-        <button class="btn btn-outline btn-sm" onclick="addLiftFromInput()" style="flex:1;">+ Add Lift</button>
-      </div>`;
+      const addSection = _liftFormOpen
+        ? `<div style="border:1.5px solid var(--green);border-radius:8px;padding:12px;margin-top:${lifts.length?'4px':'0'};">
+            <div style="font-weight:600;font-size:13px;color:var(--green);margin-bottom:10px;">New Lift</div>
+            <div style="margin-bottom:10px;">
+              <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Lift Number *</div>
+              <input type="number" id="new-lift-num" placeholder="e.g. 1" min="1" max="99" style="${inpStyle}" onkeydown="if(event.key==='Enter')addLiftFromInput()"/>
+            </div>
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Tags (optional — select all that apply)</div>
+            <div style="margin-bottom:6px;">
+              ${LIFT_TAGS.map((t,ti)=>`<span class="lift-tag-chip${_newLiftTags.includes(t)?' active':''}" onclick="toggleNewLiftTag(${ti},this)">${t}</span>`).join('')}
+              <span class="lift-tag-chip${_newLiftOtherOn?' active':''}" onclick="toggleNewLiftOther(this)">Other (Freeform)</span>
+            </div>
+            <div id="new-lift-other-wrap" style="display:${_newLiftOtherOn?'block':'none'};margin-bottom:8px;">
+              <input type="text" id="new-lift-other-input" placeholder="Describe this lift…" value="${_newLiftOtherText.replace(/"/g,'&quot;')}" style="${inpStyle}"/>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:8px;">
+              <button class="btn btn-outline btn-sm" onclick="cancelAddLiftForm()" style="flex:1;">Cancel</button>
+              <button class="btn btn-primary btn-sm" onclick="addLiftFromInput()" style="flex:1;">Add Lift →</button>
+            </div>
+          </div>`
+        : `<button class="btn btn-outline btn-sm" onclick="openAddLiftForm()" style="width:100%;margin-top:${lifts.length?'4px':'0'};">+ Add Lift</button>`;
 
-      const naBtn = `<button class="btn-na${lifts.length>0?' ':''}" onclick="toggleStageNA('M_CLifts')" style="margin-top:10px;">Mark as N/A</button>`;
+      const naBtn = `<button class="btn-na" onclick="toggleStageNA('M_CLifts')" style="margin-top:10px;">Mark as N/A</button>`;
 
       return `<div class="stage-card${hasClass}" id="stage-card-${stage.id}">
         <div class="stage-card-header">
@@ -1891,7 +2001,7 @@ function renderCaptureScreen(){
         </div>
         <div class="stage-card-body">
           <div class="stage-help">${stage.help}</div>
-          ${liftCards}${addRow}${naBtn}
+          ${liftCards}${addSection}${naBtn}
         </div>
       </div>`;
     }
