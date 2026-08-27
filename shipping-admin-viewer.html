@@ -130,6 +130,8 @@ input:focus,select:focus{border-color:var(--red);box-shadow:0 0 0 3px var(--red-
 .lift-subsection{border-top:1px solid var(--border);}
 .lift-subsection:first-child{border-top:none;}
 .lift-subhead{padding:10px 18px;background:var(--surface2);font-family:var(--font-cond);font-size:15px;font-weight:800;letter-spacing:.04em;color:var(--text);display:flex;align-items:center;}
+.lift-tags{padding:8px 16px 4px;display:flex;flex-wrap:wrap;gap:6px;}
+.lift-tag-chip{display:inline-block;padding:4px 10px;border-radius:14px;font-size:12px;font-weight:700;font-family:var(--font-cond);letter-spacing:.04em;background:var(--blue-lt);color:var(--blue);border:1px solid rgba(21,94,239,.2);}
 
 .overlay{position:fixed;inset:0;background:rgba(244,244,245,.84);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px;z-index:1000;}
 .overlay.show{display:flex;}
@@ -386,6 +388,8 @@ function getStagesForWorkflow(wf){
   return STAGES;
 }
 
+function tryParseJson(v){ if(!v) return {}; try{ return JSON.parse(v); }catch{ return {}; } }
+
 let msalApp = null;
 const loginScopes = ['User.Read','Sites.ReadWrite.All','Files.ReadWrite.All'];
 const graphScopes = ['User.Read','Sites.ReadWrite.All','Files.ReadWrite.All'];
@@ -573,6 +577,7 @@ function normalizeShipment(item){
     photoCount: 0,
     latePhotoCount: 0,
     stages: new Set(),
+    liftTags: tryParseJson(f.Lift_Tags),
     raw: f,
   };
 }
@@ -730,6 +735,7 @@ function renderPhotos(photos){
   }
   const wf = detectWorkflow(S.selected?.orderNum, photos);
   const stages = getStagesForWorkflow(wf);
+  const liftTags = S.selected?.liftTags || {};
 
   // Separate out lift photos (M_CLifts_N) from the rest
   const liftPhotosByNum = {}; // { '1': [...photos], '2': [...photos] }
@@ -766,8 +772,13 @@ function renderPhotos(photos){
       }
       const liftsInner = liftNums.map(num => {
         const liftPhotos = liftPhotosByNum[num];
+        const tags = liftTags[num] || [];
+        const tagsHtml = tags.length
+          ? `<div class="lift-tags">${tags.map(t => `<span class="lift-tag-chip">${safeHtml(t)}</span>`).join('')}</div>`
+          : '';
         return `<div class="lift-subsection">
           <div class="lift-subhead">Lift #${safeHtml(num)} <span class="stage-count" style="margin-left:8px;">${liftPhotos.length} photo${liftPhotos.length===1?'':'s'}</span></div>
+          ${tagsHtml}
           <div class="photo-grid">${liftPhotos.map(photoCardHtml).join('')}</div>
         </div>`;
       }).join('');

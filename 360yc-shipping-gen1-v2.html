@@ -1259,6 +1259,7 @@ async function openRainOrder(shipmentId, orderNum){
       comment:      f.Order_Comment||'',
       carrier:      f.Carrier||'',
       trackingNum:  f.Tracking_Number||'',
+      liftTags:     tryParseJson(f.Lift_Tags),
     };
 
     hideOverlay();
@@ -1310,6 +1311,21 @@ function emptyStages(stagesArr){
 
 function syncLiftPhotos(st){
   st.photos = (st.lifts||[]).flatMap(l => l.photos);
+}
+
+function tryParseJson(v){
+  if(!v) return {};
+  try{ return JSON.parse(v); }catch{ return {}; }
+}
+
+function collectLiftTags(){
+  const liftSt = S.stages['M_CLifts'];
+  if(!liftSt || !(liftSt.lifts||[]).length) return null;
+  const map = {};
+  for(const lift of liftSt.lifts){
+    if((lift.tags||[]).length) map[lift.num] = lift.tags;
+  }
+  return Object.keys(map).length ? JSON.stringify(map) : null;
 }
 
 function collectNewPhotos(stages){
@@ -1746,6 +1762,7 @@ async function fetchExistingShipments(token, orderNum){
       created:        f.Created || item.createdDateTime,
       photoCount:     0,
       comment:        f.Order_Comment || '',
+      liftTags:       tryParseJson(f.Lift_Tags),
     };
   });
 
@@ -2373,11 +2390,14 @@ async function submitShipment(){
       for(let attempt = 0; attempt < 2 && !patchOk; attempt++){
         if(attempt > 0) await new Promise(r => setTimeout(r, 1500));
         try{
-          await spPatchListItem(token, CFG.listShipments, S.shipmentItemId, {
+          const finalizePatch = {
             Status: 'Complete',
             Completed_DateTime: new Date().toISOString(),
             Order_Comment: S.orderComment || '',
-          });
+          };
+          const liftTagsJson = collectLiftTags();
+          if(liftTagsJson) finalizePatch.Lift_Tags = liftTagsJson;
+          await spPatchListItem(token, CFG.listShipments, S.shipmentItemId, finalizePatch);
           patchOk = true;
         }catch(err){
           if(attempt === 1){
@@ -2458,6 +2478,15 @@ async function saveForLater(){
       if(p._lift){ p._lift.savedCount = Math.max(p._lift.savedCount, p.sequence); syncLiftPhotos(S.stages['M_CLifts']); }
       else { const st = S.stages[p.stageId]; st.savedCount = Math.max(st.savedCount, p.sequence); }
       done++;
+    }
+
+    // Persist lift tags so they survive a save-and-continue session
+    if(S.shipmentItemId){
+      const liftTagsJson = collectLiftTags();
+      if(liftTagsJson){
+        try{ await spPatchListItem(token, CFG.listShipments, S.shipmentItemId, { Lift_Tags: liftTagsJson }); }
+        catch(e){ console.warn('Lift_Tags save failed (non-fatal):', e.message); }
+      }
     }
 
     hideOverlay();
@@ -3322,6 +3351,11 @@ async function confirmReopen(){
       S.stages[sid].savedCount++;
     }
 
+    // Restore saved lift tags
+    const savedLiftTagsReopen = order.liftTags || {};
+    const liftStReopen = S.stages['M_CLifts'];
+    if(liftStReopen){ for(const lift of (liftStReopen.lifts||[])){ lift.tags = savedLiftTagsReopen[lift.num] || []; } }
+
     // UI labels
     document.getElementById('capture-order-label').textContent = S.displayOrderNum || S.orderNum;
     document.getElementById('progress-order-num').textContent  = S.displayOrderNum || S.orderNum;
@@ -3416,6 +3450,11 @@ async function continueShipment(){
       S.stages[sid].savedUrls.push(p.SharePoint_URL || '');
       S.stages[sid].savedCount++;
     }
+
+    // Restore saved lift tags
+    const savedLiftTags = order.liftTags || {};
+    const liftStCont = S.stages['M_CLifts'];
+    if(liftStCont){ for(const lift of (liftStCont.lifts||[])){ lift.tags = savedLiftTags[lift.num] || []; } }
 
     document.getElementById('capture-order-label').textContent = S.displayOrderNum || S.orderNum;
     document.getElementById('progress-order-num').textContent  = S.displayOrderNum || S.orderNum;
