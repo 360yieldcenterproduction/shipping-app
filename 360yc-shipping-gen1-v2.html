@@ -150,7 +150,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 .btn-na:hover{border-color:var(--text-muted);color:var(--text);}
 .btn-na.active{background:var(--gray-mid);color:var(--text);border-style:solid;}
 .lift-tag-chip{
-  display:inline-block;padding:4px 10px;border-radius:20px;font-size:11px;
+  display:inline-block;padding:6px 12px;border-radius:20px;font-size:14px;
   border:1.5px solid var(--border);cursor:pointer;margin:3px 3px 0 0;
   color:var(--text);background:var(--surface);user-select:none;
 }
@@ -957,10 +957,12 @@ const STAGES_M_LOAD_CONTAINER = [
   {id:'M_CNumber',     label:'Container Number',  icon:'📦', canSkip:false,
    help:'Photo of the container number painted on the outside of the container.'},
   {id:'M_CLifts',      label:'Lift Photos',       icon:'🏗️', canSkip:true,
-   help:'Add one photo per lift (up to 15). Photos are numbered automatically.'},
+   help:'Add a lift for each item loaded into the container. Enter the lift number, add optional tags, then capture photos. Multiple photos per lift are allowed.'},
   {id:'M_CFinalPacked',label:'Final Packed',      icon:'✅', canSkip:false,
    help:'Photos of the machine fully packed and secured in the container.'},
-  {id:'M_CSeal',       label:'Container Seal',    icon:'🔒', canSkip:false,
+  {id:'M_CSeal_Close', label:'Container Seal — Up Close', icon:'🔒', canSkip:false,
+   help:'Close-up photo of the seal number clearly visible.'},
+  {id:'M_CSeal_Doors', label:'Container Seal — Doors Affixed', icon:'🚪', canSkip:false,
    help:'Photo of the container seal affixed and visible.'},
 ];
 
