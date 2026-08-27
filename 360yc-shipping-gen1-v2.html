@@ -3356,6 +3356,10 @@ async function confirmReopen(){
     const liftStReopen = S.stages['M_CLifts'];
     if(liftStReopen){ for(const lift of (liftStReopen.lifts||[])){ lift.tags = savedLiftTagsReopen[lift.num] || []; } }
 
+    // Drop any saved photo entries whose files were deleted directly in SharePoint
+    showOverlay('Verifying saved photos…');
+    await validateSavedPhotos(token);
+
     // UI labels
     document.getElementById('capture-order-label').textContent = S.displayOrderNum || S.orderNum;
     document.getElementById('progress-order-num').textContent  = S.displayOrderNum || S.orderNum;
@@ -3375,6 +3379,70 @@ async function confirmReopen(){
     console.error('confirmReopen error:', e);
     toast('Failed to re-open: '+e.message,'err');
   }
+}
+
+// ═══════════════════════════════════════════════════
+//  VALIDATE SAVED PHOTOS AGAINST SHAREPOINT
+//  Checks each saved URL; removes entries whose files are gone (404).
+//  Call after building S.stages from metadata, before rendering.
+// ═══════════════════════════════════════════════════
+async function validateSavedPhotos(token){
+  // Collect every saved URL from all stages
+  const checks = [];
+  for(const [sid, st] of Object.entries(S.stages)){
+    if(sid === 'M_CLifts'){
+      for(const lift of (st.lifts || [])){
+        for(let i = 0; i < (lift.savedCount || 0); i++){
+          if(lift.photos[i]?.startsWith('http')) checks.push(lift.photos[i]);
+        }
+      }
+    } else {
+      for(let i = 0; i < (st.savedCount || 0); i++){
+        if(st.photos[i]?.startsWith('http')) checks.push(st.photos[i]);
+      }
+    }
+  }
+  if(!checks.length) return;
+
+  // Probe each URL via thumbnail endpoint (5 concurrent); collect dead ones
+  const dead = new Set();
+  let ci = 0;
+  const worker = async () => {
+    while(ci < checks.length){
+      const url = checks[ci++];
+      try{
+        const marker = '/' + CFG.photoLibrary + '/';
+        const pos = url.indexOf(marker);
+        if(pos < 0){ dead.add(url); continue; }
+        const rel = decodeURIComponent(url.substring(pos + marker.length));
+        const enc = rel.split('/').map(encodeURIComponent).join('/');
+        const thumbUrl = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/drives/${S.spDriveId}/root:/${enc}:/thumbnails/0/small/content`;
+        const res = await fetch(thumbUrl, { headers:{ Authorization:`Bearer ${token}` } });
+        if(!res.ok) dead.add(url);
+      }catch{ dead.add(url); }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(5, checks.length) }, worker));
+
+  if(!dead.size) return;
+
+  // Purge dead entries from S.stages
+  for(const [sid, st] of Object.entries(S.stages)){
+    if(sid === 'M_CLifts'){
+      for(const lift of (st.lifts || [])){
+        const valid = lift.photos.slice(0, lift.savedCount).filter(u => !dead.has(u));
+        lift.photos  = [...valid, ...lift.photos.slice(lift.savedCount)];
+        lift.savedCount = valid.length;
+      }
+      syncLiftPhotos(st);
+    } else {
+      const valid = st.photos.slice(0, st.savedCount).filter(u => !dead.has(u));
+      st.photos    = [...valid, ...st.photos.slice(st.savedCount)];
+      st.savedCount = valid.length;
+      st.savedUrls  = (st.savedUrls || []).filter(u => !dead.has(u));
+    }
+  }
+  console.log(`[validateSavedPhotos] removed ${dead.size} deleted photo(s) from local state`);
 }
 
 // ═══════════════════════════════════════════════════
@@ -3455,6 +3523,10 @@ async function continueShipment(){
     const savedLiftTags = order.liftTags || {};
     const liftStCont = S.stages['M_CLifts'];
     if(liftStCont){ for(const lift of (liftStCont.lifts||[])){ lift.tags = savedLiftTags[lift.num] || []; } }
+
+    // Drop any saved photo entries whose files were deleted directly in SharePoint
+    showOverlay('Verifying saved photos…');
+    await validateSavedPhotos(token);
 
     document.getElementById('capture-order-label').textContent = S.displayOrderNum || S.orderNum;
     document.getElementById('progress-order-num').textContent  = S.displayOrderNum || S.orderNum;
