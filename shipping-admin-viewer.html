@@ -127,6 +127,9 @@ input:focus,select:focus{border-color:var(--red);box-shadow:0 0 0 3px var(--red-
 .meta-line span:first-child{font-weight:600;color:var(--text-muted);}
 .meta-line span:last-child{font-weight:700;color:var(--text);text-align:right;overflow:hidden;text-overflow:ellipsis;}
 .no-photos{padding:26px;text-align:center;color:var(--text-muted);font-family:var(--font-cond);font-weight:800;letter-spacing:.06em;text-transform:uppercase;}
+.lift-subsection{border-top:1px solid var(--border);}
+.lift-subsection:first-child{border-top:none;}
+.lift-subhead{padding:10px 18px;background:var(--surface2);font-family:var(--font-cond);font-size:15px;font-weight:800;letter-spacing:.04em;color:var(--text);display:flex;align-items:center;}
 
 .overlay{position:fixed;inset:0;background:rgba(244,244,245,.84);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px;z-index:1000;}
 .overlay.show{display:flex;}
@@ -300,6 +303,7 @@ const CFG = {
   isTest:        IS_TEST_ENV,
 };
 
+// Standard small-parts workflow
 const STAGES = [
   {id:'Cart',          label:'Cart Photos',     icon:'🛒'},
   {id:'OpenBoxes',     label:'Open Boxes',      icon:'📦'},
@@ -307,6 +311,80 @@ const STAGES = [
   {id:'PickingTicket', label:'Picking Ticket',  icon:'📋'},
   {id:'AuditSheet',    label:'Audit Sheet',     icon:'📝'},
 ];
+
+// Skid / Control Panel workflow (-L suffix)
+const STAGES_L = [
+  {id:'InsidePanel',   label:'Inside Panel',             icon:'🔧'},
+  {id:'PumpSide',      label:'Pump Side',                icon:'🔧'},
+  {id:'SupplySide',    label:'Panel Side',               icon:'🔧'},
+  {id:'PanelInterior', label:'Panel Interior Close Ups', icon:'🔍'},
+  {id:'PackedItems',   label:'Packed Items',             icon:'📦'},
+  {id:'WrappedReady',  label:'Wrapped & Ready',          icon:'📦'},
+  {id:'WorkOrder',     label:'Work Order',               icon:'📋'},
+];
+
+// RAIN Container workflow (-MC suffix)
+const STAGES_M_BUILD_CONTAINER = [
+  {id:'M_CBuild',       label:'Build Photos',                      icon:'🔨'},
+];
+const STAGES_M_LOAD_CONTAINER = [
+  {id:'M_CNumber',      label:'Container Number',                  icon:'📦'},
+  {id:'M_CLifts',       label:'Lift Photos',                       icon:'🏗️'},
+  {id:'M_CFinalPacked', label:'Final Packed',                      icon:'✅'},
+  {id:'M_CSeal_Close',  label:'Container Seal — Up Close',         icon:'🔒'},
+  {id:'M_CSeal_Doors',  label:'Container Seal — Doors Affixed',    icon:'🚪'},
+];
+
+// RAIN Trailer workflow (-MT suffix)
+const STAGES_M_BUILD_TRAILER = [
+  {id:'M_TBuild',              label:'Build Photos',                    icon:'🔨'},
+];
+const STAGES_M_LOAD_TRAILER = [
+  {id:'M_TOpenCrate_Drops',    label:'Open Crate — Drops',             icon:'📦'},
+  {id:'M_TOpenCrate_Planter',  label:'Open Crate — Planter Kit',       icon:'🌱'},
+  {id:'M_TOpenCrate_Base',     label:'Open Crate — Base Station',      icon:'📡'},
+  {id:'M_TOpenCrate_Shields',  label:'Open Crate — Wheel Shields',     icon:'🛡️'},
+  {id:'M_TOpenCrate_Other',    label:'Open Crate — Other',             icon:'📦'},
+  {id:'M_TLoadedCrate_Lid',    label:'Loaded Crate — Lid',             icon:'📦'},
+  {id:'M_TLoadedCrate_Serial', label:'Loaded Crate — Last 3 of Serial #', icon:'🔢'},
+  {id:'M_TMachine_Serial',     label:'Machine Serial # Tag',           icon:'🏷️'},
+  {id:'M_TMachine_Side',       label:'Side View Loaded',               icon:'📸'},
+  {id:'M_TMachine_Rear',       label:'Rear View',                      icon:'📸'},
+  {id:'M_TMachine_Strapping',  label:'Strapping',                      icon:'🔗'},
+];
+
+function allKnownStages(){
+  return [
+    ...STAGES,
+    ...STAGES_L,
+    ...STAGES_M_BUILD_CONTAINER,
+    ...STAGES_M_LOAD_CONTAINER,
+    ...STAGES_M_BUILD_TRAILER,
+    ...STAGES_M_LOAD_TRAILER,
+  ];
+}
+
+function detectWorkflow(orderNum, photos){
+  const num = String(orderNum || '').toUpperCase();
+  if(num.endsWith('-MT')) return 'rainTrailer';
+  if(num.endsWith('-MC')) return 'rainContainer';
+  if(num.endsWith('-L'))  return 'skid';
+  // Fallback: infer from photo stage IDs
+  for(const p of (photos || [])){
+    const sid = String(p.Stage || '');
+    if(sid.startsWith('M_C')) return 'rainContainer';
+    if(sid.startsWith('M_T')) return 'rainTrailer';
+    if(['InsidePanel','PumpSide','SupplySide','PanelInterior','PackedItems','WorkOrder'].includes(sid)) return 'skid';
+  }
+  return 'standard';
+}
+
+function getStagesForWorkflow(wf){
+  if(wf === 'rainContainer') return [...STAGES_M_BUILD_CONTAINER, ...STAGES_M_LOAD_CONTAINER];
+  if(wf === 'rainTrailer')   return [...STAGES_M_BUILD_TRAILER,   ...STAGES_M_LOAD_TRAILER];
+  if(wf === 'skid')          return STAGES_L;
+  return STAGES;
+}
 
 let msalApp = null;
 const loginScopes = ['User.Read','Sites.ReadWrite.All','Files.ReadWrite.All'];
@@ -321,7 +399,7 @@ window.addEventListener('DOMContentLoaded', init);
 
 async function init(){
   if(IS_TEST_ENV) document.getElementById('envBadge').classList.add('show');
-  for(const st of STAGES){
+  for(const st of allKnownStages()){
     const opt = document.createElement('option');
     opt.value = st.id; opt.textContent = st.label;
     document.getElementById('stageFilter').appendChild(opt);
@@ -526,7 +604,11 @@ async function attachPhotoCounts(token, shipments, includeDeleted){
     if(!s) continue;
     s.photoCount += 1;
     if(p.Added_After_Completion) s.latePhotoCount += 1;
-    if(p.Stage) s.stages.add(p.Stage);
+    if(p.Stage){
+      // Normalize lift sub-stages to their parent stage ID for filtering
+      const stageId = String(p.Stage).startsWith('M_CLifts_') ? 'M_CLifts' : p.Stage;
+      s.stages.add(stageId);
+    }
   }
 }
 
@@ -573,7 +655,7 @@ function renderResults(){
   el.innerHTML = S.filteredResults.map(s => {
     const active = S.selected?.shipmentId === s.shipmentId ? ' active' : '';
     const statusClass = s.isDeleted ? 'badge-red' : (s.status === 'Completed' ? 'badge-green' : 'badge-gray');
-    const stages = Array.from(s.stages).slice(0,3).map(x => STAGES.find(st=>st.id===x)?.label || x).join(', ');
+    const stages = Array.from(s.stages).slice(0,3).map(x => allKnownStages().find(st=>st.id===x)?.label || x).join(', ');
     return `<div class="result-card${active}" onclick="selectShipment('${safeHtml(s.shipmentId)}')">
       <div class="result-top">
         <div><div class="order-num">${safeHtml(s.orderNum)}</div><div class="ship-id">${safeHtml(s.shipmentId)}</div></div>
@@ -646,14 +728,57 @@ function renderPhotos(photos){
     document.getElementById('photoStages').innerHTML = '<div class="stage-section"><div class="no-photos">No photos found for this shipment</div></div>';
     return;
   }
+  const wf = detectWorkflow(S.selected?.orderNum, photos);
+  const stages = getStagesForWorkflow(wf);
+
+  // Separate out lift photos (M_CLifts_N) from the rest
+  const liftPhotosByNum = {}; // { '1': [...photos], '2': [...photos] }
   const byStage = {};
-  for(const st of STAGES) byStage[st.id] = [];
+  for(const st of stages) byStage[st.id] = [];
   const unknown = [];
+
   for(const p of photos){
-    if(byStage[p.Stage]) byStage[p.Stage].push(p);
-    else unknown.push(p);
+    const sid = String(p.Stage || '');
+    if(sid.startsWith('M_CLifts_')){
+      const liftNum = sid.slice('M_CLifts_'.length);
+      if(!liftPhotosByNum[liftNum]) liftPhotosByNum[liftNum] = [];
+      liftPhotosByNum[liftNum].push(p);
+    } else if(byStage[sid] !== undefined){
+      byStage[sid].push(p);
+    } else {
+      unknown.push(p);
+    }
   }
-  let html = STAGES.map(st => stageHtml(st, byStage[st.id] || [])).join('');
+
+  let html = stages.map(st => {
+    if(st.id === 'M_CLifts'){
+      // Render each lift as its own sub-section inside the Lifts stage block
+      const liftNums = Object.keys(liftPhotosByNum).sort((a,b) => {
+        const na = parseInt(a,10), nb = parseInt(b,10);
+        return isNaN(na)||isNaN(nb) ? a.localeCompare(b) : na - nb;
+      });
+      const totalLiftPhotos = Object.values(liftPhotosByNum).reduce((n,arr)=>n+arr.length,0);
+      if(!liftNums.length){
+        return `<section class="stage-section">
+          <div class="stage-head"><div class="stage-title">🏗️ &nbsp;Lift Photos</div><div class="stage-count">0 photos</div></div>
+          <div class="no-photos">No lift photos</div>
+        </section>`;
+      }
+      const liftsInner = liftNums.map(num => {
+        const liftPhotos = liftPhotosByNum[num];
+        return `<div class="lift-subsection">
+          <div class="lift-subhead">Lift #${safeHtml(num)} <span class="stage-count" style="margin-left:8px;">${liftPhotos.length} photo${liftPhotos.length===1?'':'s'}</span></div>
+          <div class="photo-grid">${liftPhotos.map(photoCardHtml).join('')}</div>
+        </div>`;
+      }).join('');
+      return `<section class="stage-section">
+        <div class="stage-head"><div class="stage-title">🏗️ &nbsp;Lift Photos</div><div class="stage-count">${totalLiftPhotos} photo${totalLiftPhotos===1?'':'s'} · ${liftNums.length} lift${liftNums.length===1?'':'s'}</div></div>
+        ${liftsInner}
+      </section>`;
+    }
+    return stageHtml(st, byStage[st.id] || []);
+  }).join('');
+
   if(unknown.length) html += stageHtml({id:'Other', label:'Other', icon:'❓'}, unknown);
   document.getElementById('photoStages').innerHTML = html;
 }
@@ -686,7 +811,12 @@ function photoCardHtml(p){
   </article>`;
 }
 
-function stageLabel(id){ return STAGES.find(s=>s.id===id)?.label || id || '—'; }
+function stageLabel(id){
+  if(!id) return '—';
+  const sid = String(id);
+  if(sid.startsWith('M_CLifts_')) return `Lift #${sid.slice('M_CLifts_'.length)}`;
+  return allKnownStages().find(s=>s.id===sid)?.label || sid;
+}
 
 async function loadThumbnails(token){
   const imgs = Array.from(document.querySelectorAll('#photoStages img[data-sp-url]'));
