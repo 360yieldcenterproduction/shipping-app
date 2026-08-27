@@ -577,7 +577,6 @@ function normalizeShipment(item){
     photoCount: 0,
     latePhotoCount: 0,
     stages: new Set(),
-    liftTags: tryParseJson(f.Lift_Tags),
     raw: f,
   };
 }
@@ -735,7 +734,6 @@ function renderPhotos(photos){
   }
   const wf = detectWorkflow(S.selected?.orderNum, photos);
   const stages = getStagesForWorkflow(wf);
-  const liftTags = S.selected?.liftTags || {};
 
   // Separate out lift photos (M_CLifts_N) from the rest
   const liftPhotosByNum = {}; // { '1': [...photos], '2': [...photos] }
@@ -772,7 +770,8 @@ function renderPhotos(photos){
       }
       const liftsInner = liftNums.map(num => {
         const liftPhotos = liftPhotosByNum[num];
-        const tags = liftTags[num] || [];
+        let tags = [];
+        try{ tags = liftPhotos[0]?.Lift_Tags ? JSON.parse(liftPhotos[0].Lift_Tags) : []; }catch{}
         const tagsHtml = tags.length
           ? `<div class="lift-tags">${tags.map(t => `<span class="lift-tag-chip">${safeHtml(t)}</span>`).join('')}</div>`
           : '';
