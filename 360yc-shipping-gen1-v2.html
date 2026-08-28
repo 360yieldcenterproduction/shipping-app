@@ -118,6 +118,21 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 .cam-hint{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.65);color:#fff;font-family:var(--font-cond);font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;padding:5px 14px;border-radius:20px;white-space:nowrap;}
 #capture-canvas{display:none;}
 
+/* ── FULLSCREEN PHOTO CAMERA (stays open across multiple shots) ── */
+#photo-cam-wrap.cam-fullscreen{position:fixed;inset:0;z-index:6000;background:#000;display:flex;flex-direction:column;}
+.cam-fs-header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:calc(env(safe-area-inset-top,0) + 12px) 14px 10px;}
+.cam-fs-label{font-family:var(--font-cond);font-weight:800;font-size:15px;letter-spacing:0.02em;color:#fff;}
+.cam-fs-count{font-size:12px;color:rgba(255,255,255,0.6);margin-top:2px;}
+.cam-fs-video{flex:1;position:relative;overflow:hidden;background:#000;}
+.cam-fs-video video{width:100%;height:100%;object-fit:cover;display:block;}
+.cam-fs-flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;}
+.cam-fs-flash.flash{animation:camFlash .25s ease-out;}
+@keyframes camFlash{from{opacity:.85;}to{opacity:0;}}
+.cam-fs-footer{display:flex;align-items:center;justify-content:center;gap:26px;padding:18px 20px calc(env(safe-area-inset-bottom,0) + 20px);}
+.cam-fs-shutter{width:68px;height:68px;border-radius:50%;background:#fff;border:4px solid rgba(255,255,255,0.35);font-size:0;flex-shrink:0;}
+.cam-fs-shutter:active{transform:scale(.94);}
+.cam-fs-done{position:absolute;right:14px;bottom:calc(env(safe-area-inset-bottom,0) + 26px);}
+
 /* ── PHOTO GRID ── */
 .photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:9px;}
 .photo-thumb{position:relative;aspect-ratio:1;border-radius:var(--radius-sm);overflow:hidden;background:var(--surface2);border:1px solid var(--border);}
@@ -694,21 +709,26 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <div class="progress-pip-row" id="progress-pips"></div>
     </div>
 
-    <!-- CAMERA (hidden until active) -->
-    <div id="photo-cam-wrap" style="display:none;">
-      <div class="card" style="padding:11px;">
-        <div class="card-label" id="cam-stage-label">Photo</div>
-        <div class="camera-wrap">
-          <video id="photo-video" autoplay playsinline muted></video>
-          <div class="cam-overlay"></div>
+    <!-- CAMERA (hidden until active) — fullscreen overlay, stays open across multiple shots -->
+    <div id="photo-cam-wrap" class="cam-fullscreen" style="display:none;">
+      <div class="cam-fs-header">
+        <div>
+          <div class="cam-fs-label" id="cam-stage-label">Photo</div>
+          <div class="cam-fs-count" id="cam-shot-count"></div>
         </div>
-        <div class="btn-row" style="margin-top:9px;">
-          <button class="btn btn-outline" onclick="stopPhotoCamera()">✕ Cancel</button>
-          <button class="btn btn-primary" onclick="capturePhoto()">📸 Capture</button>
-        </div>
-        <canvas id="capture-canvas"></canvas>
-        <input type="file" id="photo-upload-input" accept="image/*" multiple style="display:none" onchange="handlePhotoUpload(event)">
+        <button class="btn-icon" onclick="stopPhotoCamera()" title="Close camera">✕</button>
       </div>
+      <div class="cam-fs-video">
+        <video id="photo-video" autoplay playsinline muted></video>
+        <div class="cam-overlay"></div>
+        <div class="cam-fs-flash" id="cam-fs-flash"></div>
+      </div>
+      <div class="cam-fs-footer">
+        <button class="cam-fs-shutter" onclick="capturePhoto()" aria-label="Capture photo">📸</button>
+        <button class="btn btn-primary cam-fs-done" style="width:auto;padding:10px 18px;" onclick="stopPhotoCamera()">Done</button>
+      </div>
+      <canvas id="capture-canvas"></canvas>
+      <input type="file" id="photo-upload-input" accept="image/*" multiple style="display:none" onchange="handlePhotoUpload(event)">
     </div>
 
     <!-- Stage cards rendered here -->
@@ -1042,6 +1062,11 @@ let S = {
   rainShipType:null,   // 'Container' | 'Trailer'
   // Order-level comment (optional, set on capture screen after Audit Sheet)
   orderComment:'',
+  // Blob-URL cache for previously-saved photos: { spWebUrl: objectUrl }.
+  // Saved photos are stored as plain SharePoint URLs, which can't be used
+  // directly as an <img src> since the browser has no Graph auth context —
+  // validateSavedPhotos() fetches an authenticated thumbnail and caches it here.
+  savedThumbCache: {},
 };
 
 let dupState = { shipments:[], selected:null, orderNum:null, labelTarget:null };
@@ -1874,7 +1899,7 @@ function renderCaptureScreen(){
           ? `<button class="thumb-rm" disabled title="Already saved">✓</button>`
           : `<button class="thumb-rm" onclick="removeStagePhoto('ShippingLabel',${i})">✕</button>`;
         return `<div class="photo-thumb">
-          <img src="${src}" loading="lazy"/>
+          <img src="${resolvePhotoSrc(src)}" loading="lazy"/>
           ${rmBtn}
           <div class="thumb-label">Label ${i+1}${isSaved?' ✓':''}</div>
         </div>`;
@@ -1941,7 +1966,7 @@ function renderCaptureScreen(){
               const rmBtn = isSaved
                 ? `<button class="thumb-rm" disabled title="Already saved">✓</button>`
                 : `<button class="thumb-rm" onclick="removeStagePhoto('M_CLifts:${li}',${pi})">✕</button>`;
-              return `<div class="photo-thumb"><img src="${src}" loading="lazy"/>${rmBtn}<div class="thumb-label">Lift #${lift.num} (${pi+1})${isSaved?' ✓':''}</div></div>`;
+              return `<div class="photo-thumb"><img src="${resolvePhotoSrc(src)}" loading="lazy"/>${rmBtn}<div class="thumb-label">Lift #${lift.num} (${pi+1})${isSaved?' ✓':''}</div></div>`;
             }).join('')}
           </div>`;
 
@@ -2023,7 +2048,7 @@ function renderCaptureScreen(){
             ? `<button class="thumb-rm" disabled title="Already saved">✓</button>`
             : `<button class="thumb-rm" onclick="removeStagePhoto('${stage.id}',${i})">✕</button>`;
           return `<div class="photo-thumb">
-            <img src="${src}" loading="lazy"/>
+            <img src="${resolvePhotoSrc(src)}" loading="lazy"/>
             ${rmBtn}
             <div class="thumb-label">${stage.label.split(' ')[0]} ${i+1}${isSaved?' ✓':''}</div>
           </div>`;
@@ -2178,6 +2203,32 @@ async function handlePhotoUpload(evt){
   toast(`${files.length} photo${files.length!==1?'s':''} added`,'ok');
 }
 
+function currentTargetPhotoCount(){
+  const stageId = S.photoTargetStage;
+  if(!stageId) return 0;
+  if(stageId.startsWith('M_CLifts:')){
+    const li = parseInt(stageId.split(':')[1]);
+    const st = S.stages['M_CLifts'];
+    return (st && st.lifts[li]) ? st.lifts[li].photos.length : 0;
+  }
+  return S.stages[stageId] ? S.stages[stageId].photos.length : 0;
+}
+
+function updateCamShotCount(){
+  const el = document.getElementById('cam-shot-count');
+  if(!el) return;
+  const n = currentTargetPhotoCount();
+  el.textContent = n ? `${n} photo${n!==1?'s':''} so far` : 'No photos yet';
+}
+
+function flashCamera(){
+  const el = document.getElementById('cam-fs-flash');
+  if(!el) return;
+  el.classList.remove('flash');
+  void el.offsetWidth; // restart animation
+  el.classList.add('flash');
+}
+
 async function openPhotoCamera(stageId){
   S.photoTargetStage = stageId;
   const baseId = stageId.includes(':') ? stageId.split(':')[0] : stageId;
@@ -2189,15 +2240,21 @@ async function openPhotoCamera(stageId){
     if(st && st.lifts[li]) camLabel = `Lift #${st.lifts[li].num}`;
   }
   document.getElementById('cam-stage-label').textContent = camLabel;
+  updateCamShotCount();
   const camWrap = document.getElementById('photo-cam-wrap');
-  camWrap.style.display='block';
+  camWrap.style.display='flex';
   const video=document.getElementById('photo-video');
+  // Reuse an already-open stream (e.g. user switched target without closing
+  // the camera) instead of requesting a new one every time.
+  if(S.photoStream && S.photoStream.active){
+    video.srcObject = S.photoStream;
+    return;
+  }
   try{
     S.photoStream = await navigator.mediaDevices.getUserMedia({
       video:{facingMode:'environment',width:{ideal:1920},height:{ideal:1080}}
     });
     video.srcObject = S.photoStream;
-    camWrap.scrollIntoView({behavior:'smooth',block:'start'});
   }catch(e){
     toast('Camera unavailable','err');
     camWrap.style.display='none';
@@ -2215,7 +2272,6 @@ function capturePhoto(){
   canvas.width=video.videoWidth; canvas.height=video.videoHeight;
   canvas.getContext('2d').drawImage(video,0,0);
   const dataUrl=canvas.toDataURL('image/jpeg',0.88);
-  stopPhotoCamera();
 
   const stageId = S.photoTargetStage;
   if(stageId && stageId.startsWith('M_CLifts:')){
@@ -2228,8 +2284,13 @@ function capturePhoto(){
     if(!stageId || !S.stages[stageId]){ toast('Stage not found','err'); return; }
     S.stages[stageId].photos.push(dataUrl);
   }
+  // Keep the camera open for rapid multi-shot capture (e.g. several Lift
+  // photos in a row) — tearing the stream down and requesting it again on
+  // every single shot is what was triggering a fresh permission prompt
+  // each time, and forcing a scroll-to-top on reopen.
   renderCaptureScreen();
-  toast('Photo captured','ok');
+  updateCamShotCount();
+  flashCamera();
 }
 
 function removeStagePhoto(stageId, idx){
@@ -2686,6 +2747,7 @@ function resetState(){
   S.isReopen=false; S.reopenCode=''; S.reopenNote=''; S.orderComment='';
   S.isShippingLabel=false; S.isLWorkflow=false; S.isRainWorkflow=false; S.rainShipType=null;
   S.photoTargetStage=null;
+  clearSavedThumbCache();
   const orderInput = document.getElementById('order-input');
   if(orderInput) orderInput.value='';
 }
@@ -3363,6 +3425,19 @@ async function confirmReopen(){
 //  Checks each saved URL; removes entries whose files are gone (404).
 //  Call after building S.stages from metadata, before rendering.
 // ═══════════════════════════════════════════════════
+// Saved photos are stored as plain SharePoint URLs; resolve to a fetched,
+// authenticated blob URL for display when one has been cached, otherwise
+// fall back to the raw value (new captures are already local data URLs).
+function resolvePhotoSrc(src){
+  if(src && src.startsWith('http')) return S.savedThumbCache[src] || src;
+  return src;
+}
+
+function clearSavedThumbCache(){
+  for(const url of Object.values(S.savedThumbCache)) URL.revokeObjectURL(url);
+  S.savedThumbCache = {};
+}
+
 async function validateSavedPhotos(token){
   // Collect every saved URL from all stages
   const checks = [];
@@ -3381,7 +3456,8 @@ async function validateSavedPhotos(token){
   }
   if(!checks.length) return;
 
-  // Probe each URL via thumbnail endpoint (5 concurrent); collect dead ones
+  // Probe each URL via the thumbnail endpoint (5 concurrent); collect dead
+  // ones and cache a displayable blob URL for the live ones.
   const dead = new Set();
   let ci = 0;
   const worker = async () => {
@@ -3393,9 +3469,11 @@ async function validateSavedPhotos(token){
         if(pos < 0){ dead.add(url); continue; }
         const rel = decodeURIComponent(url.substring(pos + marker.length));
         const enc = rel.split('/').map(encodeURIComponent).join('/');
-        const thumbUrl = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/drives/${S.spDriveId}/root:/${enc}:/thumbnails/0/small/content`;
+        const thumbUrl = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/drives/${S.spDriveId}/root:/${enc}:/thumbnails/0/large/content`;
         const res = await fetch(thumbUrl, { headers:{ Authorization:`Bearer ${token}` } });
-        if(!res.ok) dead.add(url);
+        if(!res.ok){ dead.add(url); continue; }
+        const blob = await res.blob();
+        S.savedThumbCache[url] = URL.createObjectURL(blob);
       }catch{ dead.add(url); }
     }
   };
