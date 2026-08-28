@@ -203,7 +203,7 @@ input:focus,select:focus{border-color:var(--red);box-shadow:0 0 0 3px var(--red-
           <input id="orderSearch" type="text" placeholder="ORDR00050014" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')searchShipments()"/>
           <button class="btn btn-primary" onclick="searchShipments()">Search</button>
         </div>
-        <label id="rainOpenOnlyRow" class="check-row" style="display:none;"><input id="rainOpenOnly" type="checkbox" checked onchange="updateDateFilterVisibility();searchShipments()"/> Open orders only (started, not yet shipped)</label>
+        <label id="rainOpenOnlyRow" class="check-row" style="display:none;"><input id="rainOpenOnly" type="checkbox" onchange="updateDateFilterVisibility();searchShipments()"/> Open orders only (started, not yet shipped)</label>
         <div id="dateFilterGrid" class="filter-grid">
           <div class="field">
             <label>From</label>
@@ -226,6 +226,7 @@ input:focus,select:focus{border-color:var(--red);box-shadow:0 0 0 3px var(--red-
             <select id="statusFilter" onchange="applyClientFilters()">
               <option value="">All statuses</option>
               <option value="Complete">Complete</option>
+              <option value="Completed">Completed</option>
               <option value="Shipped">Shipped</option>
               <option value="In Progress">In Progress</option>
               <option value="Deleted">Deleted</option>
