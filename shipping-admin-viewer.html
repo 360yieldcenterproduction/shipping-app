@@ -72,6 +72,11 @@ input:focus,select:focus{border-color:var(--red);box-shadow:0 0 0 3px var(--red-
 .filter-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 .check-row{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-dim);font-weight:600;}
 .check-row input{width:16px;height:16px;accent-color:var(--red);}
+.view-tabs{display:flex;gap:4px;padding:3px;background:var(--surface2);border-radius:var(--radius-sm);}
+.view-tab{flex:1;padding:9px 6px;border-radius:calc(var(--radius-sm) - 2px);font-family:var(--font-cond);font-size:12px;font-weight:900;letter-spacing:.05em;text-transform:uppercase;color:var(--text-dim);background:transparent;text-align:center;}
+.view-tab.active{background:#fff;color:var(--text);box-shadow:var(--shadow-sm);}
+.view-tab.rain.active{color:var(--green);}
+.rain-hint{font-size:12px;color:var(--text-dim);line-height:1.5;}
 .result-meta{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text-dim);}
 .results{overflow:auto;max-height:calc(100vh - 64px - 278px);padding:10px;display:flex;flex-direction:column;gap:8px;}
 .result-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow-sm);cursor:pointer;transition:all .15s;}
@@ -188,12 +193,18 @@ input:focus,select:focus{border-color:var(--red);box-shadow:0 0 0 3px var(--red-
   <main id="mainApp" class="main">
     <aside class="sidebar">
       <div class="search-panel">
-        <div class="card-label">Search Shipments</div>
+        <div class="view-tabs">
+          <button id="tabAll" class="view-tab active" onclick="switchView('all')" type="button">All Shipments</button>
+          <button id="tabRain" class="view-tab rain" onclick="switchView('rain')" type="button">🌧️ RAIN Orders</button>
+        </div>
+        <p id="rainHint" class="rain-hint" style="display:none;">Showing RAIN Container (-MC) and Trailer (-MT) orders only.</p>
+        <div id="searchPanelLabel" class="card-label">Search Shipments</div>
         <div class="search-row">
           <input id="orderSearch" type="text" placeholder="ORDR00050014" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')searchShipments()"/>
           <button class="btn btn-primary" onclick="searchShipments()">Search</button>
         </div>
-        <div class="filter-grid">
+        <label id="rainOpenOnlyRow" class="check-row" style="display:none;"><input id="rainOpenOnly" type="checkbox" checked onchange="updateDateFilterVisibility();searchShipments()"/> Open orders only (started, not yet shipped)</label>
+        <div id="dateFilterGrid" class="filter-grid">
           <div class="field">
             <label>From</label>
             <input id="dateFrom" type="date"/>
@@ -214,7 +225,8 @@ input:focus,select:focus{border-color:var(--red);box-shadow:0 0 0 3px var(--red-
             <label>Status</label>
             <select id="statusFilter" onchange="applyClientFilters()">
               <option value="">All statuses</option>
-              <option value="Completed">Completed</option>
+              <option value="Complete">Complete</option>
+              <option value="Shipped">Shipped</option>
               <option value="In Progress">In Progress</option>
               <option value="Deleted">Deleted</option>
             </select>
@@ -394,7 +406,7 @@ let msalApp = null;
 const loginScopes = ['User.Read','Sites.ReadWrite.All','Files.ReadWrite.All'];
 const graphScopes = ['User.Read','Sites.ReadWrite.All','Files.ReadWrite.All'];
 
-const S = { user:null, token:null, spSiteId:null, spDriveId:null, selected:null, allResults:[], filteredResults:[], photosByShipment:{} };
+const S = { user:null, token:null, spSiteId:null, spDriveId:null, selected:null, allResults:[], filteredResults:[], photosByShipment:{}, viewMode:'all' };
 const thumbCache = new Map();
 let modalSpUrl = null;
 let toastTimer = null;
@@ -502,13 +514,45 @@ async function loadRecentShipments(){
   await searchShipments(true);
 }
 
+function isRainOrderNum(num){
+  const n = String(num || '').toUpperCase();
+  return n.endsWith('-MC') || n.endsWith('-MT');
+}
+
+function getDateRangeFilterValues(){
+  const from = document.getElementById('dateFrom').value;
+  const to = document.getElementById('dateTo').value;
+  // Strip milliseconds — SharePoint OData rejects .000Z in $filter
+  const fromIso = (from ? new Date(from + 'T00:00:00') : new Date(Date.now() - 30*24*60*60*1000)).toISOString().replace(/\.\d+Z$/, 'Z');
+  const toIso   = (to   ? new Date(to   + 'T23:59:59') : new Date()).toISOString().replace(/\.\d+Z$/, 'Z');
+  return {from: fromIso, to: toIso};
+}
+
+function switchView(mode){
+  if(S.viewMode === mode) return;
+  S.viewMode = mode;
+  document.getElementById('tabAll').classList.toggle('active', mode === 'all');
+  document.getElementById('tabRain').classList.toggle('active', mode === 'rain');
+  document.getElementById('rainOpenOnlyRow').style.display = mode === 'rain' ? 'flex' : 'none';
+  document.getElementById('rainHint').style.display = mode === 'rain' ? 'block' : 'none';
+  document.getElementById('searchPanelLabel').textContent = mode === 'rain' ? 'Search RAIN Orders' : 'Search Shipments';
+  updateDateFilterVisibility();
+  clearSearch();
+  searchShipments(true);
+}
+
+function updateDateFilterVisibility(){
+  const hide = S.viewMode === 'rain' && document.getElementById('rainOpenOnly').checked;
+  document.getElementById('dateFilterGrid').style.display = hide ? 'none' : 'grid';
+}
+
 async function searchShipments(forceRecent=false){
+  if(S.viewMode === 'rain') return searchRainShipments();
+
   const token = await getToken();
   if(!token) return;
   const order = document.getElementById('orderSearch').value.trim().toUpperCase();
   const includeDeleted = document.getElementById('includeDeleted').checked;
-  const from = document.getElementById('dateFrom').value;
-  const to = document.getElementById('dateTo').value;
 
   showOverlay('Loading shipments…');
   try{
@@ -518,11 +562,8 @@ async function searchShipments(forceRecent=false){
     if(order){
       items = await queryShipmentItems(token, `fields/GP_Order_Number eq '${escapeODataText(order)}'`);
     } else {
-      // Strip milliseconds — SharePoint OData rejects .000Z in $filter
-      const fromIso = (from ? new Date(from + 'T00:00:00') : new Date(Date.now() - 30*24*60*60*1000)).toISOString().replace(/\.\d+Z$/, 'Z');
-      const toIso   = (to   ? new Date(to   + 'T23:59:59') : new Date()).toISOString().replace(/\.\d+Z$/, 'Z');
-      const filter = `fields/Created ge '${fromIso}' and fields/Created le '${toIso}'`;
-      items = await queryShipmentItems(token, filter);
+      const {from, to} = getDateRangeFilterValues();
+      items = await queryShipmentItems(token, `fields/Created ge '${from}' and fields/Created le '${to}'`);
     }
 
     const shipments = items.map(normalizeShipment).filter(s => includeDeleted || !s.isDeleted);
@@ -535,6 +576,61 @@ async function searchShipments(forceRecent=false){
     hideOverlay();
     console.error(e);
     toast('Search failed: ' + (e.message || e), 'err');
+  }
+}
+
+async function searchRainShipments(){
+  const token = await getToken();
+  if(!token) return;
+  const order = document.getElementById('orderSearch').value.trim().toUpperCase();
+  const includeDeleted = document.getElementById('includeDeleted').checked;
+  const openOnly = document.getElementById('rainOpenOnly').checked;
+
+  showOverlay('Loading RAIN orders…');
+  try{
+    await ensureSpIds(token);
+    let shipmentFilterExpr, photoFilterExpr;
+
+    if(order){
+      const base = escapeODataText(order.replace(/-MC$|-MT$/, ''));
+      shipmentFilterExpr = `fields/GP_Order_Number eq '${base}-MC' or fields/GP_Order_Number eq '${base}-MT'`;
+      photoFilterExpr = shipmentFilterExpr;
+    } else if(openOnly){
+      // No date bound — an open order may have started well outside any recent window.
+      shipmentFilterExpr = `fields/Status eq 'In Progress'`;
+      photoFilterExpr = null; // computed below once we know which shipments matched
+    } else {
+      const {from, to} = getDateRangeFilterValues();
+      shipmentFilterExpr = `fields/Created ge '${from}' and fields/Created le '${to}'`;
+      photoFilterExpr = shipmentFilterExpr;
+    }
+
+    const items = await queryShipmentItems(token, shipmentFilterExpr);
+    const shipments = items.map(normalizeShipment)
+      .filter(s => isRainOrderNum(s.orderNum))
+      .filter(s => includeDeleted || !s.isDeleted);
+
+    if(!photoFilterExpr && shipments.length){
+      const minCreated = shipments.reduce((min, s) => {
+        const t = new Date(s.created || s.started || Date.now()).getTime();
+        return isNaN(t) ? min : Math.min(min, t);
+      }, Date.now());
+      const bound = new Date(minCreated - 24*60*60*1000).toISOString().replace(/\.\d+Z$/, 'Z');
+      photoFilterExpr = `fields/Created ge '${bound}'`;
+    }
+
+    if(shipments.length && photoFilterExpr){
+      await attachPhotoCountsWithFilter(token, shipments, includeDeleted, photoFilterExpr);
+    }
+
+    S.allResults = shipments.sort((a,b) => new Date(b.created || b.started || 0) - new Date(a.created || a.started || 0));
+    applyClientFilters();
+    hideOverlay();
+    if(S.filteredResults.length && !S.selected) selectShipment(S.filteredResults[0].shipmentId);
+  }catch(e){
+    hideOverlay();
+    console.error(e);
+    toast('RAIN search failed: ' + (e.message || e), 'err');
   }
 }
 
@@ -583,21 +679,22 @@ function normalizeShipment(item){
 
 async function attachPhotoCounts(token, shipments, includeDeleted){
   if(!shipments.length) return;
-  const shipIds = new Set(shipments.map(s => s.shipmentId).filter(Boolean));
-  const byShip  = Object.fromEntries(shipments.map(s => [s.shipmentId, s]));
-
   const order = document.getElementById('orderSearch').value.trim().toUpperCase();
   let filterExpr;
   if(order){
     filterExpr = `fields/GP_Order_Number eq '${escapeODataText(order)}'`;
   } else {
     // Mirror the same date window used for the shipments query
-    const from = document.getElementById('dateFrom').value;
-    const to   = document.getElementById('dateTo').value;
-    const fromIso = (from ? new Date(from + 'T00:00:00') : new Date(Date.now() - 30*24*60*60*1000)).toISOString().replace(/\.\d+Z$/, 'Z');
-    const toIso   = (to   ? new Date(to   + 'T23:59:59') : new Date()).toISOString().replace(/\.\d+Z$/, 'Z');
-    filterExpr = `fields/Created ge '${fromIso}' and fields/Created le '${toIso}'`;
+    const {from, to} = getDateRangeFilterValues();
+    filterExpr = `fields/Created ge '${from}' and fields/Created le '${to}'`;
   }
+  await attachPhotoCountsWithFilter(token, shipments, includeDeleted, filterExpr);
+}
+
+async function attachPhotoCountsWithFilter(token, shipments, includeDeleted, filterExpr){
+  if(!shipments.length) return;
+  const shipIds = new Set(shipments.map(s => s.shipmentId).filter(Boolean));
+  const byShip  = Object.fromEntries(shipments.map(s => [s.shipmentId, s]));
 
   const photoRows = await queryPhotoItems(token, filterExpr);
   for(const item of photoRows){
@@ -658,7 +755,7 @@ function renderResults(){
   }
   el.innerHTML = S.filteredResults.map(s => {
     const active = S.selected?.shipmentId === s.shipmentId ? ' active' : '';
-    const statusClass = s.isDeleted ? 'badge-red' : (s.status === 'Completed' ? 'badge-green' : 'badge-gray');
+    const statusClass = s.isDeleted ? 'badge-red' : (['Completed','Complete','Shipped'].includes(s.status) ? 'badge-green' : 'badge-gray');
     const stages = Array.from(s.stages).slice(0,3).map(x => allKnownStages().find(st=>st.id===x)?.label || x).join(', ');
     return `<div class="result-card${active}" onclick="selectShipment('${safeHtml(s.shipmentId)}')">
       <div class="result-top">
