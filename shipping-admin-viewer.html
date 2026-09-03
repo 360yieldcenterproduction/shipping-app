@@ -82,6 +82,13 @@ input:focus,select:focus{border-color:var(--red);box-shadow:0 0 0 3px var(--red-
 .result-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow-sm);cursor:pointer;transition:all .15s;}
 .result-card:hover{border-color:var(--red);box-shadow:var(--shadow);}
 .result-card.active{border-color:var(--red);background:var(--red-lt);}
+.rain-card-item{border-color:rgba(14,165,233,.4);}
+.rain-card-item:hover{border-color:#0ea5e9;}
+.rain-card-item.active{border-color:#0369a1;background:#f0f9ff;}
+.card-rain-info{display:flex;align-items:center;gap:5px;background:linear-gradient(135deg,#e0f2fe,#bae6fd);border:1px solid rgba(14,165,233,.3);border-radius:6px;padding:5px 8px;margin-bottom:8px;font-size:11px;flex-wrap:wrap;}
+.card-rain-label{font-family:var(--font-cond);font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#0369a1;font-size:10px;}
+.card-rain-val{font-weight:700;color:#0c4a6e;}
+.card-rain-sep{color:#7dd3fc;}
 .result-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px;}
 .order-num{font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--black);word-break:break-all;}
 .ship-id{font-family:var(--font-mono);font-size:12px;color:var(--text-dim);margin-top:3px;}
@@ -631,6 +638,7 @@ async function searchShipments(forceRecent=false){
     applyClientFilters();
     hideOverlay();
     if(S.filteredResults.length && !S.selected) selectShipment(S.filteredResults[0].shipmentId);
+    getRainSheetMap().then(() => renderResults());
   }catch(e){
     hideOverlay();
     console.error(e);
@@ -686,6 +694,7 @@ async function searchRainShipments(){
     applyClientFilters();
     hideOverlay();
     if(S.filteredResults.length && !S.selected) selectShipment(S.filteredResults[0].shipmentId);
+    getRainSheetMap().then(() => renderResults());
   }catch(e){
     hideOverlay();
     console.error(e);
@@ -816,11 +825,22 @@ function renderResults(){
     const active = S.selected?.shipmentId === s.shipmentId ? ' active' : '';
     const statusClass = s.isDeleted ? 'badge-red' : (['Completed','Complete','Shipped'].includes(s.status) ? 'badge-green' : 'badge-gray');
     const stages = Array.from(s.stages).slice(0,3).map(x => allKnownStages().find(st=>st.id===x)?.label || x).join(', ');
-    return `<div class="result-card${active}" onclick="selectShipment('${safeHtml(s.shipmentId)}')">
+    const wf = detectWorkflow(s.orderNum, []);
+    const isRain = wf === 'rainContainer' || wf === 'rainTrailer';
+    const rainInfo = isRain && _rainSheetMap ? (_rainSheetMap[rainBaseKey(s.orderNum)] || null) : null;
+    const rainHtml = rainInfo
+      ? `<div class="card-rain-info">
+           <span class="card-rain-label">WO</span><span class="card-rain-val">${safeHtml(rainInfo.workOrder||'—')}</span>
+           <span class="card-rain-sep">·</span>
+           <span class="card-rain-label">Dealer</span><span class="card-rain-val">${safeHtml(rainInfo.dealer||'—')}</span>
+         </div>`
+      : '';
+    return `<div class="result-card${active}${isRain?' rain-card-item':''}" onclick="selectShipment('${safeHtml(s.shipmentId)}')">
       <div class="result-top">
         <div><div class="order-num">${safeHtml(s.orderNum)}</div><div class="ship-id">${safeHtml(s.shipmentId)}</div></div>
         <div class="photo-count">${s.photoCount} photo${s.photoCount===1?'':'s'}</div>
       </div>
+      ${rainHtml}
       <div class="result-lines">
         <div><strong>Packed:</strong> ${safeHtml(s.packedBy)}</div>
         <div><strong>Completed:</strong> ${safeHtml(fmtDate(s.completed))}</div>
