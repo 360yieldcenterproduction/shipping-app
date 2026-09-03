@@ -138,8 +138,14 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 .photo-thumb{position:relative;aspect-ratio:1;border-radius:var(--radius-sm);overflow:hidden;background:var(--surface2);border:1px solid var(--border);}
 .photo-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
 .thumb-label{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.62);font-family:var(--font-cond);font-size:9px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:#fff;padding:3px 4px;text-align:center;}
-.thumb-rm{position:absolute;top:3px;right:3px;width:19px;height:19px;background:var(--red);border-radius:50%;border:none;color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;line-height:1;}
-.thumb-rm:disabled{opacity:0.55;background:var(--gray);}
+.thumb-rm{position:absolute;top:3px;right:3px;width:22px;height:22px;background:var(--red);border-radius:50%;border:none;color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;line-height:1;opacity:0;transition:opacity .15s;}
+.photo-thumb:hover .thumb-rm{opacity:1;}
+.thumb-rm-pending{background:var(--gray);cursor:default;font-size:10px;opacity:1!important;}
+.thumb-rm-saved{background:rgba(0,0,0,.55);}
+.del-photo-modal{background:#fff;border-radius:var(--radius-lg);padding:28px 24px;max-width:360px;width:100%;box-shadow:var(--shadow-lg);border-top:4px solid var(--red);display:flex;flex-direction:column;gap:16px;}
+.del-photo-modal h3{font-family:var(--font-cond);font-size:22px;font-weight:900;text-transform:uppercase;letter-spacing:.04em;color:var(--text);}
+.del-photo-modal p{font-size:14px;color:var(--text-dim);line-height:1.5;}
+.del-photo-actions{display:flex;gap:10px;justify-content:flex-end;}
 
 /* ── STAGE CARDS (the new 5-card capture screen) ── */
 .stage-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-sm);overflow:hidden;}
@@ -840,6 +846,18 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   </div>
 </div>
 
+<!-- Delete Photo confirmation -->
+<div id="del-photo-modal-bg" style="position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:9000;padding:20px;">
+  <div class="del-photo-modal">
+    <h3>Delete this photo?</h3>
+    <p>This permanently removes the photo from SharePoint. This action cannot be undone.</p>
+    <div class="del-photo-actions">
+      <button class="btn btn-outline" onclick="cancelDeletePhoto()">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmDeletePhoto()">Delete</button>
+    </div>
+  </div>
+</div>
+
 <!-- Delete Shipment dialog -->
 <div id="delete-dialog-bg" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);display:none;align-items:flex-end;justify-content:center;z-index:8500;padding-bottom:env(safe-area-inset-bottom,0);">
   <div style="background:var(--surface);border-radius:var(--radius-lg) var(--radius-lg) 0 0;padding:24px 20px 28px;width:100%;max-width:480px;box-shadow:var(--shadow-lg);">
@@ -1327,11 +1345,13 @@ function emptyStages(stagesArr){
   const arr = stagesArr || activeStages();
   const out = {};
   for(const s of arr){
-    out[s.id] = { photos:[], savedCount:0, savedUrls:[], na:false };
+    out[s.id] = { photos:[], savedCount:0, savedUrls:[], savedMeta:[], na:false };
     if(s.id === 'M_CLifts') out[s.id].lifts = [];
   }
   return out;
 }
+
+function emptyLift(num){ return {num, photos:[], savedCount:0, savedMeta:[], tags:[]}; }
 
 function syncLiftPhotos(st){
   st.photos = (st.lifts||[]).flatMap(l => l.photos);
@@ -1964,8 +1984,8 @@ function renderCaptureScreen(){
             ${lift.photos.map((src,pi)=>{
               const isSaved = pi < lift.savedCount;
               const rmBtn = isSaved
-                ? `<button class="thumb-rm" disabled title="Already saved">✓</button>`
-                : `<button class="thumb-rm" onclick="removeStagePhoto('M_CLifts:${li}',${pi})">✕</button>`;
+                ? `<button class="thumb-rm thumb-rm-saved" onclick="removeStagePhoto('M_CLifts:${li}',${pi})" title="Delete from SharePoint">✕</button>`
+                : `<button class="thumb-rm thumb-rm-pending" title="Saving…">⏳</button>`;
               return `<div class="photo-thumb"><img src="${resolvePhotoSrc(src)}" loading="lazy"/>${rmBtn}<div class="thumb-label">Lift #${lift.num} (${pi+1})${isSaved?' ✓':''}</div></div>`;
             }).join('')}
           </div>`;
@@ -2045,8 +2065,8 @@ function renderCaptureScreen(){
         ${st.photos.map((src,i)=>{
           const isSaved = i < st.savedCount;
           const rmBtn = isSaved
-            ? `<button class="thumb-rm" disabled title="Already saved">✓</button>`
-            : `<button class="thumb-rm" onclick="removeStagePhoto('${stage.id}',${i})">✕</button>`;
+            ? `<button class="thumb-rm thumb-rm-saved" onclick="removeStagePhoto('${stage.id}',${i})" title="Delete from SharePoint">✕</button>`
+            : `<button class="thumb-rm thumb-rm-pending" title="Saving…">⏳</button>`;
           return `<div class="photo-thumb">
             <img src="${resolvePhotoSrc(src)}" loading="lazy"/>
             ${rmBtn}
@@ -2166,6 +2186,146 @@ function updateSubmitBtn(){
 }
 
 // ═══════════════════════════════════════════════════
+//  AUTO-SAVE A SINGLE PHOTO IMMEDIATELY AFTER CAPTURE
+// ═══════════════════════════════════════════════════
+async function autoSavePhoto(stageId, photoIdx, liftRef){
+  // stageId: stage key (e.g. 'M_CFinalPacked') or 'M_CLifts' when liftRef is set
+  // photoIdx: index within st.photos (or lift.photos) of the new photo
+  // liftRef: the lift object if this is a lift photo, else null
+  try{
+    const token = await getToken();
+    await ensureSpIds(token);
+    const userName  = S.user?.name || S.user?.username || '';
+    const userEmail = S.user?.username || S.user?.name || '';
+    const now = new Date().toISOString();
+
+    const src = liftRef ? liftRef.photos[photoIdx] : S.stages[stageId].photos[photoIdx];
+    if(!src || src.startsWith('http')) return; // already a SP URL, skip
+
+    const sequence   = photoIdx + 1;
+    const spStageId  = liftRef ? `M_CLifts_${liftRef.num}` : stageId;
+    const folderPath = `${S.orderNum}/${S.shipmentId}/${spStageId}`;
+    const fileName   = `${S.shipmentId}_${spStageId}_${sequence}_${Date.now()}.jpg`;
+
+    const blob  = dataUrlToBlob(src);
+    const spUrl = await spUploadFile(token, folderPath, fileName, blob);
+
+    const fields = {
+      Title:                  fileName,
+      GP_Order_Number:        S.orderNum,
+      Shipment_ID:            S.shipmentId,
+      Stage:                  spStageId,
+      Photo_Sequence:         sequence,
+      SharePoint_URL:         spUrl,
+      File_Name:              fileName,
+      Captured_By:            userName,
+      Captured_Email:         userEmail,
+      Captured_DateTime:      now,
+      Added_After_Completion: !!S.isReopen,
+      Reason_Code:            S.isReopen ? (S.reopenCode||'') : '',
+      Reason_Note:            S.isReopen ? (S.reopenNote||'') : '',
+      Is_Deleted:             false,
+    };
+    if(liftRef && (liftRef.tags||[]).length) fields.Lift_Tags = JSON.stringify(liftRef.tags);
+
+    const created = await spCreateListItem(token, CFG.listPhotos, fields);
+    const meta = { url: spUrl, itemId: created.id, fileName };
+
+    if(liftRef){
+      liftRef.photos[photoIdx] = spUrl;
+      liftRef.savedCount++;
+      liftRef.savedMeta = liftRef.savedMeta || [];
+      liftRef.savedMeta.push(meta);
+      syncLiftPhotos(S.stages['M_CLifts']);
+    } else {
+      const st = S.stages[stageId];
+      st.photos[photoIdx] = spUrl;
+      st.savedCount++;
+      st.savedUrls.push(spUrl);
+      st.savedMeta = st.savedMeta || [];
+      st.savedMeta.push(meta);
+    }
+    renderCaptureScreen();
+  }catch(e){
+    console.error('autoSavePhoto failed:', e);
+    toast('Photo save failed — it will be retried when you finish the order', 'err');
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  DELETE A SAVED PHOTO (SP file + list item)
+// ═══════════════════════════════════════════════════
+let _delPending = null; // {stageId, photoIdx, liftIdx}
+
+function promptDeletePhoto(stageId, photoIdx, liftIdx){
+  _delPending = {stageId, photoIdx, liftIdx: liftIdx ?? null};
+  document.getElementById('del-photo-modal-bg').style.display = 'flex';
+}
+function cancelDeletePhoto(){
+  _delPending = null;
+  document.getElementById('del-photo-modal-bg').style.display = 'none';
+}
+async function confirmDeletePhoto(){
+  document.getElementById('del-photo-modal-bg').style.display = 'none';
+  if(!_delPending) return;
+  const {stageId, photoIdx, liftIdx} = _delPending;
+  _delPending = null;
+
+  showOverlay('Deleting photo…');
+  try{
+    const token = await getToken();
+    await ensureSpIds(token);
+
+    const liftRef  = (liftIdx !== null) ? S.stages['M_CLifts']?.lifts[liftIdx] : null;
+    const metaArr  = liftRef ? (liftRef.savedMeta||[]) : (S.stages[stageId]?.savedMeta||[]);
+    // savedMeta indices correspond to saved photo slots (0..savedCount-1)
+    const meta     = metaArr[photoIdx];
+
+    if(meta?.itemId){
+      // Soft-delete the list item
+      try{ await spPatchListItem(token, CFG.listPhotos, meta.itemId, { Is_Deleted: true }); }
+      catch(e){ console.warn('List item soft-delete failed:', e.message); }
+
+      // Hard-delete the file from the drive
+      try{
+        const marker = '/' + CFG.photoLibrary + '/';
+        const pos = (meta.url||'').indexOf(marker);
+        if(pos >= 0){
+          const rel = decodeURIComponent(meta.url.substring(pos + marker.length));
+          const enc = rel.split('/').map(encodeURIComponent).join('/');
+          await fetch(
+            `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/drives/${S.spDriveId}/root:/${enc}`,
+            { method:'DELETE', headers:{ Authorization:`Bearer ${token}` } }
+          );
+        }
+      }catch(e){ console.warn('File delete failed:', e.message); }
+    }
+
+    // Remove from local state
+    if(liftRef){
+      liftRef.photos.splice(photoIdx, 1);
+      liftRef.savedCount = Math.max(0, liftRef.savedCount - 1);
+      if(liftRef.savedMeta) liftRef.savedMeta.splice(photoIdx, 1);
+      syncLiftPhotos(S.stages['M_CLifts']);
+    } else {
+      const st = S.stages[stageId];
+      st.photos.splice(photoIdx, 1);
+      st.savedCount = Math.max(0, st.savedCount - 1);
+      if(st.savedUrls)  st.savedUrls.splice(photoIdx, 1);
+      if(st.savedMeta)  st.savedMeta.splice(photoIdx, 1);
+    }
+
+    hideOverlay();
+    renderCaptureScreen();
+    toast('Photo deleted', 'ok');
+  }catch(e){
+    hideOverlay();
+    console.error('confirmDeletePhoto error:', e);
+    toast('Delete failed: ' + e.message, 'err');
+  }
+}
+
+// ═══════════════════════════════════════════════════
 //  PHOTO CAMERA (per-stage)
 // ═══════════════════════════════════════════════════
 let uploadTargetStage = null;
@@ -2187,20 +2347,25 @@ async function handlePhotoUpload(evt){
     const li = parseInt(stageId.split(':')[1]);
     const st = S.stages['M_CLifts'];
     if(!st || !st.lifts[li]) return;
+    const lift = st.lifts[li];
     for(const file of files){
       const dataUrl = await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=e=>res(e.target.result); r.onerror=rej; r.readAsDataURL(file); });
-      st.lifts[li].photos.push(dataUrl);
+      const idx = lift.photos.length;
+      lift.photos.push(dataUrl);
+      autoSavePhoto('M_CLifts', idx, lift);
     }
     syncLiftPhotos(st);
   } else {
     if(!S.stages[stageId]) return;
     for(const file of files){
       const dataUrl = await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=e=>res(e.target.result); r.onerror=rej; r.readAsDataURL(file); });
+      const idx = S.stages[stageId].photos.length;
       S.stages[stageId].photos.push(dataUrl);
+      autoSavePhoto(stageId, idx, null);
     }
   }
   renderCaptureScreen();
-  toast(`${files.length} photo${files.length!==1?'s':''} added`,'ok');
+  toast(`${files.length} photo${files.length!==1?'s':''} added — saving…`,'ok');
 }
 
 function currentTargetPhotoCount(){
@@ -2278,11 +2443,16 @@ function capturePhoto(){
     const li = parseInt(stageId.split(':')[1]);
     const st = S.stages['M_CLifts'];
     if(!st || !st.lifts[li]){ toast('Lift not found','err'); return; }
-    st.lifts[li].photos.push(dataUrl);
+    const lift = st.lifts[li];
+    const idx  = lift.photos.length;
+    lift.photos.push(dataUrl);
     syncLiftPhotos(st);
+    autoSavePhoto('M_CLifts', idx, lift);
   } else {
     if(!stageId || !S.stages[stageId]){ toast('Stage not found','err'); return; }
+    const idx = S.stages[stageId].photos.length;
     S.stages[stageId].photos.push(dataUrl);
+    autoSavePhoto(stageId, idx, null);
   }
   // Keep the camera open for rapid multi-shot capture (e.g. several Lift
   // photos in a row) — tearing the stream down and requesting it again on
@@ -2299,7 +2469,7 @@ function removeStagePhoto(stageId, idx){
     const st = S.stages['M_CLifts'];
     if(!st || !st.lifts[li]) return;
     const lift = st.lifts[li];
-    if(idx < lift.savedCount){ toast('Saved photos cannot be removed from the app','err'); return; }
+    if(idx < lift.savedCount){ promptDeletePhoto('M_CLifts', idx, li); return; }
     lift.photos.splice(idx, 1);
     syncLiftPhotos(st);
     renderCaptureScreen();
@@ -2307,10 +2477,7 @@ function removeStagePhoto(stageId, idx){
   }
   const st = S.stages[stageId];
   if(!st) return;
-  if(idx < st.savedCount){
-    toast('Saved photos cannot be removed from the app','err');
-    return;
-  }
+  if(idx < st.savedCount){ promptDeletePhoto(stageId, idx, null); return; }
   st.photos.splice(idx,1);
   renderCaptureScreen();
 }
@@ -3379,9 +3546,11 @@ async function confirmReopen(){
         const st = S.stages['M_CLifts'];
         if(st){
           let lift = st.lifts.find(l => l.num === liftNum);
-          if(!lift){ lift = {num:liftNum, photos:[], savedCount:0, tags:[]}; st.lifts.push(lift); }
+          if(!lift){ lift = emptyLift(liftNum); st.lifts.push(lift); }
           lift.photos.push(p.SharePoint_URL || '');
           lift.savedCount++;
+          lift.savedMeta = lift.savedMeta || [];
+          lift.savedMeta.push({ url: p.SharePoint_URL||'', itemId: p.id||'', fileName: p.File_Name||'' });
           if((!lift.tags || !lift.tags.length) && p.Lift_Tags){
             try{ lift.tags = JSON.parse(p.Lift_Tags); }catch{ lift.tags = []; }
           }
@@ -3393,6 +3562,8 @@ async function confirmReopen(){
       S.stages[sid].photos.push(p.SharePoint_URL || '');
       S.stages[sid].savedUrls.push(p.SharePoint_URL || '');
       S.stages[sid].savedCount++;
+      S.stages[sid].savedMeta = S.stages[sid].savedMeta || [];
+      S.stages[sid].savedMeta.push({ url: p.SharePoint_URL||'', itemId: p.id||'', fileName: p.File_Name||'' });
     }
 
     // Drop any saved photo entries whose files were deleted directly in SharePoint
@@ -3561,9 +3732,11 @@ async function continueShipment(){
         const st = S.stages['M_CLifts'];
         if(st){
           let lift = st.lifts.find(l => l.num === liftNum);
-          if(!lift){ lift = {num:liftNum, photos:[], savedCount:0, tags:[]}; st.lifts.push(lift); }
+          if(!lift){ lift = emptyLift(liftNum); st.lifts.push(lift); }
           lift.photos.push(p.SharePoint_URL || '');
           lift.savedCount++;
+          lift.savedMeta = lift.savedMeta || [];
+          lift.savedMeta.push({ url: p.SharePoint_URL||'', itemId: p.id||'', fileName: p.File_Name||'' });
           if((!lift.tags || !lift.tags.length) && p.Lift_Tags){
             try{ lift.tags = JSON.parse(p.Lift_Tags); }catch{ lift.tags = []; }
           }
@@ -3575,6 +3748,8 @@ async function continueShipment(){
       S.stages[sid].photos.push(p.SharePoint_URL || '');
       S.stages[sid].savedUrls.push(p.SharePoint_URL || '');
       S.stages[sid].savedCount++;
+      S.stages[sid].savedMeta = S.stages[sid].savedMeta || [];
+      S.stages[sid].savedMeta.push({ url: p.SharePoint_URL||'', itemId: p.id||'', fileName: p.File_Name||'' });
     }
 
     // Drop any saved photo entries whose files were deleted directly in SharePoint
