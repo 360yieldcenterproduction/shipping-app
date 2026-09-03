@@ -137,6 +137,12 @@ input:focus,select:focus{border-color:var(--red);box-shadow:0 0 0 3px var(--red-
 .lift-subhead{padding:10px 18px;background:var(--surface2);font-family:var(--font-cond);font-size:15px;font-weight:800;letter-spacing:.04em;color:var(--text);display:flex;align-items:center;}
 .lift-tags{padding:8px 16px 4px;display:flex;flex-wrap:wrap;gap:6px;}
 .lift-tag-chip{display:inline-block;padding:4px 10px;border-radius:14px;font-size:12px;font-weight:700;font-family:var(--font-cond);letter-spacing:.04em;background:var(--blue-lt);color:var(--blue);border:1px solid rgba(21,94,239,.2);}
+.rain-badge{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#0ea5e9,#0369a1);color:#fff;font-family:var(--font-cond);font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;padding:4px 12px;border-radius:20px;margin-bottom:10px;}
+.rain-badge::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.7);}
+.rain-grid{margin-bottom:10px!important;}
+.rain-card{border-color:rgba(14,165,233,.35)!important;background:linear-gradient(135deg,#f0f9ff,#e0f2fe)!important;}
+.rain-card label{color:#0369a1!important;}
+.rain-card div{color:#0c4a6e!important;}
 
 .overlay{position:fixed;inset:0;background:rgba(244,244,245,.84);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px;z-index:1000;}
 .overlay.show{display:flex;}
@@ -260,6 +266,13 @@ input:focus,select:focus{border-color:var(--red);box-shadow:0 0 0 3px var(--red-
           <div class="detail-actions">
             <button class="btn btn-dark btn-sm" onclick="openSelectedSharePointFolder()">Open SharePoint Folder</button>
             <button class="btn btn-dark btn-sm" onclick="copySelectedLink()">Copy Folder Link</button>
+          </div>
+        </div>
+        <div id="sumRainExtra" style="display:none;">
+          <div class="rain-badge">RAIN Order</div>
+          <div class="summary-grid rain-grid">
+            <div class="summary-card rain-card"><label>Work Order</label><div id="sumWorkOrder">—</div></div>
+            <div class="summary-card rain-card"><label>Dealer</label><div id="sumDealer">—</div></div>
           </div>
         </div>
         <div class="summary-grid">
@@ -402,6 +415,51 @@ function getStagesForWorkflow(wf){
 }
 
 function tryParseJson(v){ if(!v) return {}; try{ return JSON.parse(v); }catch{ return {}; } }
+
+// ── Google Sheet CSV (RAIN orders only, no API key) ──
+const RAIN_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRyTgWYqxTowKZALIFQ4MAotGIu3N7llTWPTHdVncba-7-pRN7lAWRovFTzD4RXrXO19D9Vaw4ejfyM/pub?gid=0&single=true&output=csv';
+let _rainSheetMap = null;
+
+function parseCSVRow(line){
+  const cols = []; let cur = ''; let inQ = false;
+  for(let i = 0; i < line.length; i++){
+    const c = line[i];
+    if(c === '"'){ if(inQ && line[i+1] === '"'){ cur += '"'; i++; } else inQ = !inQ; }
+    else if(c === ',' && !inQ){ cols.push(cur); cur = ''; }
+    else cur += c;
+  }
+  cols.push(cur);
+  return cols;
+}
+
+async function getRainSheetMap(){
+  if(_rainSheetMap) return _rainSheetMap;
+  try{
+    const res = await fetch(RAIN_CSV_URL);
+    if(!res.ok){ _rainSheetMap = {}; return {}; }
+    const text = await res.text();
+    const map = {};
+    text.split('\n').forEach((line, idx) => {
+      if(idx === 0) return;
+      const cols = parseCSVRow(line);
+      const key = String(cols[10]||'').trim().toUpperCase(); // col K = base ORDR
+      if(key) map[key] = { workOrder: String(cols[0]||'').trim(), dealer: String(cols[5]||'').trim() };
+    });
+    _rainSheetMap = map;
+    return map;
+  }catch(e){
+    console.warn('getRainSheetMap failed:', e);
+    _rainSheetMap = {};
+    return {};
+  }
+}
+
+function rainBaseKey(orderNum){
+  const n = String(orderNum||'').toUpperCase();
+  if(n.endsWith('-MC')) return n.slice(0, -3);
+  if(n.endsWith('-MT')) return n.slice(0, -3);
+  return n;
+}
 
 let msalApp = null;
 const loginScopes = ['User.Read','Sites.ReadWrite.All','Files.ReadWrite.All'];
@@ -782,11 +840,15 @@ async function selectShipment(shipmentId){
   if(!shipment) return;
   S.selected = shipment;
   renderResults();
-  renderShipmentSummary(shipment);
+  const wf = detectWorkflow(shipment.orderNum, []);
+  const sheetData = (wf === 'rainContainer' || wf === 'rainTrailer')
+    ? (await getRainSheetMap())[rainBaseKey(shipment.orderNum)] || null
+    : null;
+  renderShipmentSummary(shipment, sheetData);
   await loadShipmentPhotos(shipment);
 }
 
-function renderShipmentSummary(s){
+function renderShipmentSummary(s, sheetData){
   document.getElementById('emptyState').style.display = 'none';
   document.getElementById('detail').classList.add('active');
   document.getElementById('detailOrder').textContent = s.orderNum || '—';
@@ -799,6 +861,17 @@ function renderShipmentSummary(s){
   document.getElementById('sumCompleted').textContent = fmtDate(s.completed);
   document.getElementById('sumSeq').textContent = s.seq || '—';
   document.getElementById('sumItem').textContent = s.itemId || '—';
+
+  // RAIN-only: Work Order + Dealer from Google Sheet
+  const rainExtra = document.getElementById('sumRainExtra');
+  if(sheetData && (sheetData.workOrder || sheetData.dealer)){
+    rainExtra.style.display = '';
+    document.getElementById('sumWorkOrder').textContent = sheetData.workOrder || '—';
+    document.getElementById('sumDealer').textContent    = sheetData.dealer    || '—';
+  } else {
+    rainExtra.style.display = 'none';
+  }
+
   document.getElementById('photoStages').innerHTML = '<div class="stage-section"><div class="no-photos">Loading photos…</div></div>';
 }
 
