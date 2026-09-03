@@ -1161,6 +1161,14 @@ function inferRainTypeFromPhotos(photos){
 
 // ── RAIN Orders Dashboard ────────────────────────────────────────────────────
 
+function companionAutoTag(letter){
+  if(!letter) return '';
+  const l = String(letter).toUpperCase();
+  if(l === 'A') return 'Base Station / Remote / Comms';
+  if(l === 'B') return 'B Order';
+  return l + ' Order';
+}
+
 // Fetch the published CSV and build a map: { "ORDR00050688": {workOrder:"2027-01", dealer:"Acme"} }
 async function fetchRainSheetMap(){
   const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRyTgWYqxTowKZALIFQ4MAotGIu3N7llTWPTHdVncba-7-pRN7lAWRovFTzD4RXrXO19D9Vaw4ejfyM/pub?gid=0&single=true&output=csv';
@@ -1225,7 +1233,7 @@ async function loadRainDashboard(){
       .map(i => i.fields)
       .filter(f => {
         const num = String(f.GP_Order_Number||'');
-        return num.endsWith('-MC') || num.endsWith('-MT');
+        return num.endsWith('-MC') || num.endsWith('-MT') || !!f.Order_Suffix;
       })
       .filter(f => {
         if(f.Status === 'Shipped'){
@@ -1252,23 +1260,41 @@ function renderRainDashboard(orders, sheetMap){
     return;
   }
   listEl.innerHTML = orders.map(f => {
-    const orderNum = String(f.GP_Order_Number||'');
-    const base     = orderNum.replace(/-MC$|-MT$/, '').substring(0,12).toUpperCase();
-    const sheet    = sheetMap[base] || {};
-    const workOrder  = sheet.workOrder || '—';
-    const dealer     = sheet.dealer    || '—';
-    const type       = orderNum.endsWith('-MC') ? '🚢 Container' : '🚛 Trailer';
-    const status     = f.Status || 'In Progress';
-    const statusClr  = status === 'Shipped' ? 'var(--text-muted)' : 'var(--green)';
-    const shipId     = f.Shipment_ID || '';
-    const displayNum = orderNum.slice(0, orderNum.lastIndexOf('-'));
-    return `<div class="card" style="padding:12px 14px;margin-bottom:8px;cursor:pointer;border-left:3px solid var(--green);"
+    const orderNum    = String(f.GP_Order_Number||'');
+    const suffix      = f.Order_Suffix || '';
+    const isCompanion = !!suffix && !orderNum.endsWith('-MC') && !orderNum.endsWith('-MT');
+
+    const status    = f.Status || 'In Progress';
+    const shipId    = f.Shipment_ID || '';
+
+    let topLine, subLine, borderColor, statusClr;
+
+    if(isCompanion){
+      const tag = companionAutoTag(suffix);
+      topLine     = `<div style="font-weight:600;font-size:15px;">${suffix} Order &nbsp;<span style="font-size:12px;font-weight:400;color:var(--amber);">${tag}</span></div>`;
+      subLine     = `🔗 RAIN Companion &nbsp;·&nbsp; ${orderNum}`;
+      borderColor = 'var(--amber)';
+      statusClr   = status === 'Shipped' ? 'var(--text-muted)' : 'var(--amber)';
+    } else {
+      const base      = orderNum.replace(/-MC$|-MT$/, '').substring(0,12).toUpperCase();
+      const sheet     = sheetMap[base] || {};
+      const workOrder = sheet.workOrder || '—';
+      const dealer    = sheet.dealer    || '—';
+      const type      = orderNum.endsWith('-MC') ? '🚢 Container' : '🚛 Trailer';
+      const displayNum = orderNum.slice(0, orderNum.lastIndexOf('-'));
+      topLine     = `<div style="font-weight:600;font-size:15px;">${workOrder} — ${dealer}</div>`;
+      subLine     = `${type} &nbsp;·&nbsp; ${displayNum}`;
+      borderColor = 'var(--green)';
+      statusClr   = status === 'Shipped' ? 'var(--text-muted)' : 'var(--green)';
+    }
+
+    return `<div class="card" style="padding:12px 14px;margin-bottom:8px;cursor:pointer;border-left:3px solid ${borderColor};"
                  onclick="openRainOrder('${shipId}','${orderNum}')">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
-        <div style="font-weight:600;font-size:15px;">${workOrder} — ${dealer}</div>
+        ${topLine}
         <div style="font-size:11px;color:${statusClr};white-space:nowrap;">${status}</div>
       </div>
-      <div style="font-size:12px;color:var(--text-dim);margin-top:3px;">${type} &nbsp;·&nbsp; ${displayNum}</div>
+      <div style="font-size:12px;color:var(--text-dim);margin-top:3px;">${subLine}</div>
     </div>`;
   }).join('');
 }
@@ -1310,7 +1336,22 @@ async function openRainOrder(shipmentId, orderNum){
     if(f.Status === 'In Progress'){
       await continueShipment();
     } else {
+      const dwf = detectWorkflow(f.GP_Order_Number || orderNum);
+      const detailDisplayNum = dwf.display || f.GP_Order_Number || orderNum;
+      document.getElementById('detail-header-num').textContent  = f.Shipment_ID || detailDisplayNum;
+      document.getElementById('detail-order-num').textContent   = detailDisplayNum;
+      document.getElementById('detail-shipment-id').textContent = f.Shipment_ID || '—';
+      document.getElementById('detail-status').textContent      = f.Status || '—';
+      document.getElementById('detail-photo-count').textContent = '—';
+      document.getElementById('detail-packed-by').textContent   = f.Packer_Name || '—';
+      document.getElementById('detail-started').textContent     = f.Started_DateTime ? new Date(f.Started_DateTime).toLocaleString() : '—';
+      document.getElementById('detail-completed').textContent   = (f.Shipped_DateTime||f.Completed_DateTime) ? new Date(f.Shipped_DateTime||f.Completed_DateTime).toLocaleString() : '—';
+      document.getElementById('detail-comment').textContent     = f.Order_Comment || '—';
+      document.getElementById('detail-stages').innerHTML        = '<div class="empty-state"><div class="empty-icon">⏳</div>Loading photos…</div>';
+      document.getElementById('btn-continue-shipment').style.display = 'none';
+      document.getElementById('btn-reopen-shipment').style.display   = '';
       showScreen('screen-detail');
+      await loadOrderPhotoDetail(f.GP_Order_Number || orderNum, f.Shipment_ID || shipmentId);
     }
   }catch(e){
     hideOverlay();
@@ -1872,6 +1913,11 @@ async function startCapture(){
       Packer_Name:       userName,
       Is_Deleted:        false,
     };
+    // Tag companion orders (A, B, etc.) so the RAIN dashboard can surface them
+    const companionMatch = S.orderNum.match(/([A-Z])$/i);
+    if(companionMatch && !S.orderNum.endsWith('-MC') && !S.orderNum.endsWith('-MT') && !S.orderNum.endsWith('-L')){
+      fields.Order_Suffix = companionMatch[1].toUpperCase();
+    }
 
     const created = await spCreateListItem(token, CFG.listShipments, fields);
     S.shipmentItemId = created.id;

@@ -85,6 +85,12 @@ input:focus,select:focus{border-color:var(--red);box-shadow:0 0 0 3px var(--red-
 .rain-card-item{border-color:rgba(14,165,233,.4);}
 .rain-card-item:hover{border-color:#0ea5e9;}
 .rain-card-item.active{border-color:#0369a1;background:#f0f9ff;}
+.companion-card-item{border-color:rgba(245,158,11,.4);}
+.companion-card-item:hover{border-color:#f59e0b;}
+.companion-card-item.active{border-color:#b45309;background:#fffbeb;}
+.card-companion-info{display:flex;align-items:center;gap:6px;background:linear-gradient(135deg,#fef3c7,#fde68a);border:1px solid rgba(245,158,11,.35);border-radius:6px;padding:5px 8px;margin-bottom:8px;font-size:11px;flex-wrap:wrap;}
+.card-companion-label{font-family:var(--font-cond);font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#92400e;font-size:10px;}
+.card-companion-tag{font-weight:700;color:#78350f;}
 .card-rain-info{display:flex;align-items:center;gap:5px;background:linear-gradient(135deg,#e0f2fe,#bae6fd);border:1px solid rgba(14,165,233,.3);border-radius:6px;padding:5px 8px;margin-bottom:8px;font-size:11px;flex-wrap:wrap;}
 .card-rain-label{font-family:var(--font-cond);font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#0369a1;font-size:10px;}
 .card-rain-val{font-weight:700;color:#0c4a6e;}
@@ -150,6 +156,7 @@ input:focus,select:focus{border-color:var(--red);box-shadow:0 0 0 3px var(--red-
 .rain-card{border-color:rgba(14,165,233,.35)!important;background:linear-gradient(135deg,#f0f9ff,#e0f2fe)!important;}
 .rain-card label{color:#0369a1!important;}
 .rain-card div{color:#0c4a6e!important;}
+.companion-badge{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#f59e0b,#b45309);color:#fff;font-family:var(--font-cond);font-size:11px;font-weight:900;letter-spacing:.08em;padding:4px 12px;border-radius:20px;margin-bottom:10px;}
 
 .overlay{position:fixed;inset:0;background:rgba(244,244,245,.84);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px;z-index:1000;}
 .overlay.show{display:flex;}
@@ -281,6 +288,9 @@ input:focus,select:focus{border-color:var(--red);box-shadow:0 0 0 3px var(--red-
             <div class="summary-card rain-card"><label>Work Order</label><div id="sumWorkOrder">—</div></div>
             <div class="summary-card rain-card"><label>Dealer</label><div id="sumDealer">—</div></div>
           </div>
+        </div>
+        <div id="sumCompanionExtra" style="display:none;">
+          <div class="companion-badge">&#x1F517; RAIN Companion — <span id="sumCompanionLabel"></span></div>
         </div>
         <div class="summary-grid">
           <div class="summary-card"><label>Shipment ID</label><div class="mono" id="sumShipment">—</div></div>
@@ -422,6 +432,14 @@ function getStagesForWorkflow(wf){
 }
 
 function tryParseJson(v){ if(!v) return {}; try{ return JSON.parse(v); }catch{ return {}; } }
+
+function companionAutoTag(letter){
+  if(!letter) return '';
+  const l = String(letter).toUpperCase();
+  if(l === 'A') return 'Base Station / Remote / Comms';
+  if(l === 'B') return 'B Order';
+  return l + ' Order';
+}
 
 // ── Google Sheet CSV (RAIN orders only, no API key) ──
 const RAIN_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRyTgWYqxTowKZALIFQ4MAotGIu3N7llTWPTHdVncba-7-pRN7lAWRovFTzD4RXrXO19D9Vaw4ejfyM/pub?gid=0&single=true&output=csv';
@@ -738,6 +756,7 @@ function normalizeShipment(item){
     deletedBy: f.Deleted_By || '',
     deletedDate: f.Deleted_DateTime || '',
     deletedReason: f.Deleted_Reason || '',
+    companionSuffix: f.Order_Suffix || '',
     photoCount: 0,
     latePhotoCount: 0,
     stages: new Set(),
@@ -827,6 +846,7 @@ function renderResults(){
     const stages = Array.from(s.stages).slice(0,3).map(x => allKnownStages().find(st=>st.id===x)?.label || x).join(', ');
     const wf = detectWorkflow(s.orderNum, []);
     const isRain = wf === 'rainContainer' || wf === 'rainTrailer';
+    const isCompanion = !!s.companionSuffix;
     const rainInfo = isRain && _rainSheetMap ? (_rainSheetMap[rainBaseKey(s.orderNum)] || null) : null;
     const rainHtml = rainInfo
       ? `<div class="card-rain-info">
@@ -834,8 +854,10 @@ function renderResults(){
            <span class="card-rain-sep">·</span>
            <span class="card-rain-label">Dealer</span><span class="card-rain-val">${safeHtml(rainInfo.dealer||'—')}</span>
          </div>`
-      : '';
-    return `<div class="result-card${active}${isRain?' rain-card-item':''}" onclick="selectShipment('${safeHtml(s.shipmentId)}')">
+      : isCompanion
+        ? `<div class="card-companion-info"><span class="card-companion-label">&#x1F517; ${safeHtml(s.companionSuffix)} Order</span><span class="card-companion-tag">${safeHtml(companionAutoTag(s.companionSuffix))}</span></div>`
+        : '';
+    return `<div class="result-card${active}${isRain?' rain-card-item':''}${isCompanion?' companion-card-item':''}" onclick="selectShipment('${safeHtml(s.shipmentId)}')">
       <div class="result-top">
         <div><div class="order-num">${safeHtml(s.orderNum)}</div><div class="ship-id">${safeHtml(s.shipmentId)}</div></div>
         <div class="photo-count">${s.photoCount} photo${s.photoCount===1?'':'s'}</div>
@@ -884,12 +906,20 @@ function renderShipmentSummary(s, sheetData){
 
   // RAIN-only: Work Order + Dealer from Google Sheet
   const rainExtra = document.getElementById('sumRainExtra');
+  const companionExtra = document.getElementById('sumCompanionExtra');
+  const companionSuffix = s.companionSuffix || '';
   if(sheetData && (sheetData.workOrder || sheetData.dealer)){
     rainExtra.style.display = '';
     document.getElementById('sumWorkOrder').textContent = sheetData.workOrder || '—';
     document.getElementById('sumDealer').textContent    = sheetData.dealer    || '—';
   } else {
     rainExtra.style.display = 'none';
+  }
+  if(companionSuffix){
+    companionExtra.style.display = '';
+    document.getElementById('sumCompanionLabel').textContent = companionSuffix + ' Order — ' + companionAutoTag(companionSuffix);
+  } else {
+    companionExtra.style.display = 'none';
   }
 
   document.getElementById('photoStages').innerHTML = '<div class="stage-section"><div class="no-photos">Loading photos…</div></div>';
