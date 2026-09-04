@@ -2277,6 +2277,11 @@ async function autoSavePhoto(stageId, photoIdx, liftRef){
     const created = await spCreateListItem(token, CFG.listPhotos, fields);
     const meta = { url: spUrl, itemId: created.id, fileName };
 
+    // Cache the original dataUrl under the SP URL key so resolvePhotoSrc()
+    // can display it immediately — the browser can't load SP URLs without auth.
+    // validateSavedPhotos() will later swap in a proper blob URL.
+    S.savedThumbCache[spUrl] = src;
+
     if(liftRef){
       liftRef.photos[photoIdx] = spUrl;
       liftRef.savedCount++;
