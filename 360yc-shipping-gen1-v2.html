@@ -1271,17 +1271,15 @@ async function loadRainDashboard(){
 async function fetchRainOrderStages(token, orders){
   if(!orders.length) return {};
   try{
-    // Build client-side lookup sets — avoids complex OR filter on non-indexed columns
     const sidSet   = new Set(orders.map(o => o.Shipment_ID).filter(Boolean));
     const numSet   = new Set(orders.map(o => o.GP_Order_Number).filter(Boolean));
     const numToSid = {};
     for(const o of orders){ if(o.GP_Order_Number && o.Shipment_ID) numToSid[o.GP_Order_Number] = o.Shipment_ID; }
 
-    // lastModifiedDateTime is a top-level indexed field — reliable filter
-    const cutoff = new Date(Date.now() - 60*24*60*60*1000).toISOString();
+    // No filter — same approach as loadOrderPhotoDetail fallback (known to work)
     const url = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listPhotos}/items`
-      + `?$expand=fields&$filter=${encodeURIComponent(`lastModifiedDateTime ge '${cutoff}'`)}&$top=500`;
-    const res = await fetch(url, { headers:{ Authorization:`Bearer ${token}` } });
+      + `?$expand=fields&$top=500`;
+    const res = await fetch(url, { headers:{ Authorization:`Bearer ${token}`, Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly' } });
     if(!res.ok){ console.warn('fetchRainOrderStages HTTP', res.status); return {}; }
     const data = await res.json();
 
@@ -1292,7 +1290,7 @@ async function fetchRainOrderStages(token, orders){
       const stg = f.Stage;
       if(!stg) continue;
       let key = null;
-      if(f.Shipment_ID && sidSet.has(f.Shipment_ID))         key = f.Shipment_ID;
+      if(f.Shipment_ID && sidSet.has(f.Shipment_ID))             key = f.Shipment_ID;
       else if(f.GP_Order_Number && numSet.has(f.GP_Order_Number)) key = numToSid[f.GP_Order_Number] || f.GP_Order_Number;
       if(!key) continue;
       if(!map[key]) map[key] = new Set();
@@ -1377,7 +1375,7 @@ function renderRainDashboard(orders, sheetMap, stageMap){
       ${nameLabel ? `<div style="font-size:11px;color:var(--text-dim);margin-bottom:3px;">${nameLabel}</div>` : ''}
       <div style="font-size:11px;color:var(--text-dim);margin-bottom:6px;">${typeLabel}</div>
       ${stageHtml}
-      <div style="font-size:11px;color:var(--text-muted);margin-top:5px;">${startedStr}</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:5px;">${startedStr}${isOpen && f.Started_DateTime ? (() => { const d = Math.floor((Date.now() - new Date(f.Started_DateTime).getTime())/(864e5)); return d > 0 ? ` &nbsp;·&nbsp; <span style="color:${d>=3?'var(--red)':d>=2?'var(--amber)':'var(--text-muted)'};">Open ${d}d</span>` : ''; })() : ''}</div>
       ${closingHtml}
     </div>`;
   }).join('');
