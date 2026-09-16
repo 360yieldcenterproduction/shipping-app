@@ -1234,6 +1234,7 @@ async function loadRainDashboard(){
 
     const rainOrders = (data.value||[])
       .map(i => i.fields)
+      .filter(f => f.Is_Deleted !== true)
       .filter(f => {
         const num = String(f.GP_Order_Number||'');
         return num.endsWith('-MC') || num.endsWith('-MT') || !!f.Order_Suffix;
@@ -1270,33 +1271,29 @@ async function loadRainDashboard(){
 async function fetchRainOrderStages(token, orders){
   if(!orders.length) return {};
   try{
-    // Build a reverse-lookup so we can map photo records back to a Shipment_ID key
-    // Photos may be stored under Shipment_ID OR GP_Order_Number (older orders)
-    const sidToKey = {}; // Shipment_ID → Shipment_ID (identity)
-    const numToKey = {}; // GP_Order_Number → Shipment_ID (fallback)
-    const parts    = [];
-    for(const o of orders.slice(0,12)){
-      const sid = o.Shipment_ID;
-      const num = o.GP_Order_Number;
-      const key = sid || num;
-      if(!key) continue;
-      if(sid){ sidToKey[sid] = key; parts.push(`fields/Shipment_ID eq '${sid.replace(/'/g,"''")}'`); }
-      if(num){ numToKey[num] = key; parts.push(`fields/GP_Order_Number eq '${num.replace(/'/g,"''")}'`); }
-    }
-    if(!parts.length) return {};
-    const filter = `(${parts.join(' or ')})`;
+    // Build client-side lookup sets — avoids complex OR filter on non-indexed columns
+    const sidSet   = new Set(orders.map(o => o.Shipment_ID).filter(Boolean));
+    const numSet   = new Set(orders.map(o => o.GP_Order_Number).filter(Boolean));
+    const numToSid = {};
+    for(const o of orders){ if(o.GP_Order_Number && o.Shipment_ID) numToSid[o.GP_Order_Number] = o.Shipment_ID; }
+
+    // lastModifiedDateTime is a top-level indexed field — reliable filter
+    const cutoff = new Date(Date.now() - 60*24*60*60*1000).toISOString();
     const url = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listPhotos}/items`
-      + `?$expand=fields($select=Shipment_ID,GP_Order_Number,Stage,Is_Deleted)&$filter=${encodeURIComponent(filter)}&$top=500`;
-    const res = await fetch(url, { headers:{ Authorization:`Bearer ${token}`, Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly' } });
-    if(!res.ok){ console.warn('fetchRainOrderStages HTTP', res.status, await res.text().catch(()=>'')); return {}; }
+      + `?$expand=fields&$filter=${encodeURIComponent(`lastModifiedDateTime ge '${cutoff}'`)}&$top=500`;
+    const res = await fetch(url, { headers:{ Authorization:`Bearer ${token}` } });
+    if(!res.ok){ console.warn('fetchRainOrderStages HTTP', res.status); return {}; }
     const data = await res.json();
+
     const map = {};
     for(const item of (data.value||[])){
       const f = item.fields || {};
       if(f.Is_Deleted === true) continue;
       const stg = f.Stage;
       if(!stg) continue;
-      const key = sidToKey[f.Shipment_ID] || numToKey[f.GP_Order_Number];
+      let key = null;
+      if(f.Shipment_ID && sidSet.has(f.Shipment_ID))         key = f.Shipment_ID;
+      else if(f.GP_Order_Number && numSet.has(f.GP_Order_Number)) key = numToSid[f.GP_Order_Number] || f.GP_Order_Number;
       if(!key) continue;
       if(!map[key]) map[key] = new Set();
       map[key].add(stg);
