@@ -662,15 +662,6 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <div class="confirm-hero-sub" id="confirm-hero-sub">GP Order Number</div>
       <div class="confirm-hero-num" id="confirm-num">—</div>
     </div>
-    <div class="card">
-      <div class="card-label">Verify before continuing</div>
-      <p id="confirm-help-text" style="font-size:13px;color:var(--text-dim);line-height:1.6;margin-bottom:13px;">Confirm this order number matches your picking ticket. All photos will be filed under this number.</p>
-      <div class="btn-row">
-        <button class="btn btn-outline" onclick="goBack('screen-scan')" style="flex:1;">← Re-scan</button>
-        <button class="btn btn-primary" onclick="startCapture()" style="flex:2;">Confirm & Continue →</button>
-      </div>
-    </div>
-
     <!-- RAIN Machine type selector (hidden for non-RAIN orders) -->
     <div id="rain-type-card" class="card" style="display:none;border-top:3px solid var(--green);">
       <div class="card-label" style="color:var(--green);">🌧️ &nbsp;RAIN Machine — Select Shipping Method</div>
@@ -679,6 +670,15 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <button class="btn btn-outline" id="btn-rain-container" onclick="selectRainType('Container')" style="flex:1;">🚢&nbsp;Container</button>
       </div>
       <div id="rain-type-hint" style="text-align:center;font-size:12px;color:var(--text-muted);margin-top:8px;">Select a shipping method before tapping "Confirm &amp; Continue"</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Verify before continuing</div>
+      <p id="confirm-help-text" style="font-size:13px;color:var(--text-dim);line-height:1.6;margin-bottom:13px;">Confirm this order number matches your picking ticket. All photos will be filed under this number.</p>
+      <div class="btn-row">
+        <button class="btn btn-outline" onclick="goBack('screen-scan')" style="flex:1;">← Re-scan</button>
+        <button class="btn btn-primary" onclick="startCapture()" style="flex:2;">Confirm & Continue →</button>
+      </div>
     </div>
 
     <div class="bottom-safe"></div>
@@ -1215,7 +1215,6 @@ async function loadRainDashboard(){
     // Fetch all RAIN shipments (-MC and -MT suffixes)
     // We use OR filter: status in (In Progress, Shipped) and orderNum ends with -MC or -MT
     // SharePoint doesn't support endsWith, so we fetch recent and filter client-side.
-    const cutoff = new Date(Date.now() - 3*24*60*60*1000).toISOString(); // 3 days ago
     const filterExpr = `fields/Status ne 'Cancelled'`;
     const url = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listShipments}/items`+
       `?$expand=fields&$filter=${encodeURIComponent(filterExpr)}&$top=500&$orderby=fields/Created desc`;
@@ -1236,11 +1235,12 @@ async function loadRainDashboard(){
         return num.endsWith('-MC') || num.endsWith('-MT') || !!f.Order_Suffix;
       })
       .filter(f => {
-        if(f.Status === 'Shipped'){
-          const shipped = new Date(f.Shipped_Date || f.Modified).getTime();
-          return shipped >= cutoffMs;
-        }
-        return f.Status !== 'Cancelled';
+        const status = f.Status || '';
+        if(status === 'In Progress') return true;
+        if(status === 'Cancelled') return false;
+        // Any terminal status (Shipped, Completed, Complete, etc.) — only show if recent
+        const shipped = new Date(f.Shipped_DateTime || f.Shipped_Date || f.Modified).getTime();
+        return shipped >= cutoffMs;
       });
 
     const sheetMap = await fetchRainSheetMap();
