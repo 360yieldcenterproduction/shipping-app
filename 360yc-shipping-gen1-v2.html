@@ -1371,7 +1371,10 @@ async function checkRainSheet(orderNum){
     const res = await fetch(CSV_URL);
     if(!res.ok) return false;
     const text = await res.text();
-    const target = orderNum.substring(0,12).toUpperCase().trim();
+    // Exact match after stripping workflow suffixes — do NOT truncate, which
+    // caused B-companion orders (ORDR00052035B) to match the parent (ORDR00052035).
+    const target = orderNum.toUpperCase().trim()
+      .replace(/-MC$/, '').replace(/-MT$/, '').replace(/-L$/, '');
     return text.split('\n').some(line => {
       const cols = parseCSVRow(line);
       return String(cols[10]||'').trim().toUpperCase() === target;

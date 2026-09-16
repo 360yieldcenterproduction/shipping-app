@@ -480,9 +480,11 @@ async function getRainSheetMap(){
 }
 
 function rainBaseKey(orderNum){
-  const n = String(orderNum||'').toUpperCase();
-  if(n.endsWith('-MC')) return n.slice(0, -3);
-  if(n.endsWith('-MT')) return n.slice(0, -3);
+  let n = String(orderNum||'').toUpperCase();
+  if(n.endsWith('-MC')) n = n.slice(0, -3);
+  else if(n.endsWith('-MT')) n = n.slice(0, -3);
+  // Strip companion letter (A, B, …) so lookup hits the parent RAIN order
+  n = n.replace(/[A-Z]$/, '');
   return n;
 }
 
@@ -757,8 +759,8 @@ function normalizeShipment(item){
     deletedDate: f.Deleted_DateTime || '',
     deletedReason: f.Deleted_Reason || '',
     companionSuffix: f.Order_Suffix || (() => {
-      const n = String(f.GP_Order_Number || '');
-      if(n.endsWith('-MC') || n.endsWith('-MT') || n.endsWith('-L')) return '';
+      // Strip workflow suffix first (-MC, -MT, -L), then check for companion letter
+      const n = String(f.GP_Order_Number || '').replace(/-MC$/i,'').replace(/-MT$/i,'').replace(/-L$/i,'');
       const m = n.match(/([A-Z])$/i);
       return m ? m[1].toUpperCase() : '';
     })(),
@@ -852,7 +854,8 @@ function renderResults(){
     const wf = detectWorkflow(s.orderNum, []);
     const isRain = wf === 'rainContainer' || wf === 'rainTrailer';
     const isCompanion = !!s.companionSuffix;
-    const rainInfo = isRain && _rainSheetMap ? (_rainSheetMap[rainBaseKey(s.orderNum)] || null) : null;
+    // Don't show blue RAIN band on companions — amber companion band takes priority
+    const rainInfo = isRain && !isCompanion && _rainSheetMap ? (_rainSheetMap[rainBaseKey(s.orderNum)] || null) : null;
     const rainHtml = rainInfo
       ? `<div class="card-rain-info">
            <span class="card-rain-label">WO</span><span class="card-rain-val">${safeHtml(rainInfo.workOrder||'—')}</span>
@@ -913,7 +916,8 @@ function renderShipmentSummary(s, sheetData){
   const rainExtra = document.getElementById('sumRainExtra');
   const companionExtra = document.getElementById('sumCompanionExtra');
   const companionSuffix = s.companionSuffix || '';
-  if(sheetData && (sheetData.workOrder || sheetData.dealer)){
+  // Show blue RAIN band only for machine orders, not companions
+  if(!companionSuffix && sheetData && (sheetData.workOrder || sheetData.dealer)){
     rainExtra.style.display = '';
     document.getElementById('sumWorkOrder').textContent = sheetData.workOrder || '—';
     document.getElementById('sumDealer').textContent    = sheetData.dealer    || '—';
