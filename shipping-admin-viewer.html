@@ -756,7 +756,12 @@ function normalizeShipment(item){
     deletedBy: f.Deleted_By || '',
     deletedDate: f.Deleted_DateTime || '',
     deletedReason: f.Deleted_Reason || '',
-    companionSuffix: f.Order_Suffix || '',
+    companionSuffix: f.Order_Suffix || (() => {
+      const n = String(f.GP_Order_Number || '');
+      if(n.endsWith('-MC') || n.endsWith('-MT') || n.endsWith('-L')) return '';
+      const m = n.match(/([A-Z])$/i);
+      return m ? m[1].toUpperCase() : '';
+    })(),
     photoCount: 0,
     latePhotoCount: 0,
     stages: new Set(),

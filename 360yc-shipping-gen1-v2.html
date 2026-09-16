@@ -3389,9 +3389,10 @@ async function loadOrderPhotoDetail(orderNum, shipmentId){
       </div>`;
     }
 
-    // Surface any truly unexpected Stage values (data drift / older rows)
-    const knownIds = new Set(allKnownStages().map(s=>s.id));
-    const unknownPhotos = allPhotos.filter(p => !knownIds.has(p.Stage));
+    // Show any photos whose stage wasn't rendered in the main sections above
+    // (e.g. RAIN-workflow photos on a standard B order, or vice-versa).
+    const shownIds = new Set([...detailStages.map(s=>s.id), 'ShippingLabel']);
+    const unknownPhotos = allPhotos.filter(p => !shownIds.has(p.Stage));
     if(unknownPhotos.length > 0){
       html += '<div style="height:8px;"></div>';
       html += `<div class="box-section">
