@@ -75,6 +75,10 @@ input,select{font-family:var(--font);outline:none;}
 /* ── CARDS ── */
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow-sm);}
 .card-label{font-family:var(--font-cond);font-size:10px;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted);margin-bottom:9px;}
+.rain-order-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:8px;box-shadow:var(--shadow-sm);cursor:pointer;transition:box-shadow .12s;}
+.rain-order-card:active{box-shadow:none;opacity:.9;}
+.rain-stage-chips{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0;}
+.rain-stage-chip{font-size:10px;font-family:var(--font-cond);font-weight:700;letter-spacing:.04em;padding:2px 7px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);color:var(--text-dim);white-space:nowrap;}
 
 /* ── FORMS ── */
 .field-group{display:flex;flex-direction:column;gap:5px;}
@@ -1243,8 +1247,19 @@ async function loadRainDashboard(){
         return shipped >= cutoffMs;
       });
 
-    const sheetMap = await fetchRainSheetMap();
-    renderRainDashboard(rainOrders, sheetMap);
+    // Sort: In Progress first, then by start date descending
+    rainOrders.sort((a, b) => {
+      const aIP = (a.Status||'') === 'In Progress';
+      const bIP = (b.Status||'') === 'In Progress';
+      if(aIP !== bIP) return aIP ? -1 : 1;
+      return new Date(b.Started_DateTime||b.Created||0) - new Date(a.Started_DateTime||a.Created||0);
+    });
+
+    const [sheetMap, stageMap] = await Promise.all([
+      fetchRainSheetMap(),
+      fetchRainOrderStages(token, rainOrders.map(f => f.Shipment_ID).filter(Boolean)),
+    ]);
+    renderRainDashboard(rainOrders, sheetMap, stageMap);
   }catch(e){
     console.error('loadRainDashboard error:', e);
     const listEl = document.getElementById('rain-orders-list');
@@ -1252,49 +1267,104 @@ async function loadRainDashboard(){
   }
 }
 
-function renderRainDashboard(orders, sheetMap){
+async function fetchRainOrderStages(token, shipmentIds){
+  if(!shipmentIds.length) return {};
+  try{
+    const idParts = shipmentIds.slice(0,25).map(id => `fields/Shipment_ID eq '${id.replace(/'/g,"''")}'`);
+    const filter  = `(${idParts.join(' or ')}) and fields/Is_Deleted ne true`;
+    const url = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listPhotos}/items`
+      + `?$select=fields/Shipment_ID,fields/Stage&$filter=${encodeURIComponent(filter)}&$top=500`;
+    const res = await fetch(url, { headers:{ Authorization:`Bearer ${token}`, Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly' } });
+    if(!res.ok) return {};
+    const data = await res.json();
+    const map = {};
+    for(const item of (data.value||[])){
+      const sid = item.fields?.Shipment_ID;
+      const stg = item.fields?.Stage;
+      if(sid && stg){
+        if(!map[sid]) map[sid] = new Set();
+        map[sid].add(stg);
+      }
+    }
+    return map;
+  }catch(e){
+    console.warn('fetchRainOrderStages failed:', e);
+    return {};
+  }
+}
+
+function renderRainDashboard(orders, sheetMap, stageMap){
   const listEl = document.getElementById('rain-orders-list');
   if(!listEl) return;
   if(!orders.length){
     listEl.innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div><div>No open RAIN orders</div></div>';
     return;
   }
+
+  const allStages = allKnownStages();
+  const fmtShort  = dt => dt ? new Date(dt).toLocaleDateString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : '—';
+
   listEl.innerHTML = orders.map(f => {
     const orderNum    = String(f.GP_Order_Number||'');
-    const suffix      = f.Order_Suffix || '';
-    const isCompanion = !!suffix && !orderNum.endsWith('-MC') && !orderNum.endsWith('-MT');
+    const baseNum     = orderNum.replace(/-MC$/i,'').replace(/-MT$/i,'').replace(/-L$/i,'');
+    const suffix      = f.Order_Suffix || (()=>{ const m=baseNum.match(/([A-Z])$/i); return m?m[1].toUpperCase():''; })();
+    const isCompanion = !!suffix;
+    const status      = f.Status || 'In Progress';
+    const isOpen      = status === 'In Progress';
+    const shipId      = f.Shipment_ID || '';
 
-    const status    = f.Status || 'In Progress';
-    const shipId    = f.Shipment_ID || '';
-
-    let topLine, subLine, borderColor, statusClr;
-
+    // ── Identity row ──────────────────────────────────────────────
+    let accentColor, typeLabel, nameLabel;
     if(isCompanion){
-      const tag = companionAutoTag(suffix);
-      topLine     = `<div style="font-weight:600;font-size:15px;">${suffix} Order &nbsp;<span style="font-size:12px;font-weight:400;color:var(--amber);">${tag}</span></div>`;
-      subLine     = `🔗 RAIN Companion &nbsp;·&nbsp; ${orderNum}`;
-      borderColor = 'var(--amber)';
-      statusClr   = status === 'Shipped' ? 'var(--text-muted)' : 'var(--amber)';
+      accentColor = 'var(--amber)';
+      typeLabel   = `🔗 ${suffix} Order — ${companionAutoTag(suffix)}`;
+      nameLabel   = baseNum.replace(/[A-Z]$/i,'');
     } else {
-      const base      = orderNum.replace(/-MC$|-MT$/, '').substring(0,12).toUpperCase();
-      const sheet     = sheetMap[base] || {};
-      const workOrder = sheet.workOrder || '—';
-      const dealer    = sheet.dealer    || '—';
-      const type      = orderNum.endsWith('-MC') ? '🚢 Container' : '🚛 Trailer';
-      const displayNum = orderNum.slice(0, orderNum.lastIndexOf('-'));
-      topLine     = `<div style="font-weight:600;font-size:15px;">${workOrder} — ${dealer}</div>`;
-      subLine     = `${type} &nbsp;·&nbsp; ${displayNum}`;
-      borderColor = 'var(--green)';
-      statusClr   = status === 'Shipped' ? 'var(--text-muted)' : 'var(--green)';
+      accentColor = 'var(--green)';
+      const sheet = sheetMap[baseNum.replace(/[A-Z]$/i,'').toUpperCase()] || {};
+      nameLabel   = (sheet.workOrder||'') + (sheet.workOrder&&sheet.dealer?' — ':'') + (sheet.dealer||'');
+      if(!nameLabel) nameLabel = orderNum.includes('-') ? orderNum.slice(0,orderNum.lastIndexOf('-')) : orderNum;
+      typeLabel   = orderNum.endsWith('-MC') ? '🚢 Container' : '🚛 Trailer';
     }
 
-    return `<div class="card" style="padding:12px 14px;margin-bottom:8px;cursor:pointer;border-left:3px solid ${borderColor};"
-                 onclick="openRainOrder('${shipId}','${orderNum}')">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
-        ${topLine}
-        <div style="font-size:11px;color:${statusClr};white-space:nowrap;">${status}</div>
+    // ── Status badge ──────────────────────────────────────────────
+    const statusBg  = isOpen ? 'background:var(--green);color:#fff;' : 'background:var(--gray-lt);color:var(--gray-dk);';
+    const statusBadge = `<span style="font-size:10px;font-weight:800;font-family:var(--font-cond);letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:20px;white-space:nowrap;${statusBg}">${isOpen?'In Progress':'Closed'}</span>`;
+
+    // ── Stage chips ───────────────────────────────────────────────
+    const stages   = stageMap[shipId] ? [...stageMap[shipId]] : [];
+    const stageHtml = stages.length
+      ? `<div class="rain-stage-chips">${stages.map(sid => {
+          const def = allStages.find(s=>s.id===sid) || allStages.find(s=>sid.startsWith(s.id+'_'));
+          const label = def ? def.icon + ' ' + def.label.split(' ')[0] : sid.replace(/^M_[CT]/,'');
+          return `<span class="rain-stage-chip">${label}</span>`;
+        }).join('')}</div>`
+      : `<div style="font-size:11px;color:var(--text-muted);margin:5px 0 2px;">No photos yet</div>`;
+
+    // ── Dates row ─────────────────────────────────────────────────
+    const startedStr = f.Started_DateTime ? `Started ${fmtShort(f.Started_DateTime)}` : '';
+    let closingHtml = '';
+    if(!isOpen){
+      const shippedMs  = new Date(f.Shipped_DateTime || f.Modified).getTime();
+      const daysLeft   = 3 - (Date.now() - shippedMs) / (24*60*60*1000);
+      const daysLeftRd = Math.max(0, Math.ceil(daysLeft));
+      const clr = daysLeft > 2 ? 'var(--green)' : daysLeft > 1 ? 'var(--amber)' : 'var(--red)';
+      const closedStr  = fmtShort(f.Shipped_DateTime || f.Modified);
+      closingHtml = `<div style="font-size:11px;margin-top:5px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="color:var(--text-dim);">Closed ${closedStr}</span>
+        <span style="color:${clr};font-weight:700;font-size:10px;">${daysLeftRd>0?`Falls off in ${daysLeftRd}d`:'Falling off soon'}</span>
+      </div>`;
+    }
+
+    return `<div class="rain-order-card" style="border-left:3px solid ${accentColor};" onclick="openRainOrder('${shipId}','${orderNum}')">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px;">
+        <div style="font-weight:700;font-size:14px;color:var(--text);line-height:1.2;">${nameLabel}</div>
+        ${statusBadge}
       </div>
-      <div style="font-size:12px;color:var(--text-dim);margin-top:3px;">${subLine}</div>
+      <div style="font-size:11px;color:var(--text-dim);margin-bottom:6px;">${typeLabel}</div>
+      ${stageHtml}
+      <div style="font-size:11px;color:var(--text-muted);margin-top:5px;">${startedStr}</div>
+      ${closingHtml}
     </div>`;
   }).join('');
 }
