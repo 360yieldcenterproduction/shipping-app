@@ -1258,7 +1258,7 @@ async function loadRainDashboard(){
 
     const [sheetMap, stageMap] = await Promise.all([
       fetchRainSheetMap(),
-      fetchRainOrderStages(token, rainOrders),
+      fetchRainPhotoCount(token, rainOrders),
     ]);
     renderRainDashboard(rainOrders, sheetMap, stageMap);
   }catch(e){
@@ -1268,7 +1268,7 @@ async function loadRainDashboard(){
   }
 }
 
-async function fetchRainOrderStages(token, orders){
+async function fetchRainPhotoCount(token, orders){
   if(!orders.length) return {};
   try{
     const sidSet   = new Set(orders.map(o => o.Shipment_ID).filter(Boolean));
@@ -1276,34 +1276,30 @@ async function fetchRainOrderStages(token, orders){
     const numToSid = {};
     for(const o of orders){ if(o.GP_Order_Number && o.Shipment_ID) numToSid[o.GP_Order_Number] = o.Shipment_ID; }
 
-    // No filter — same approach as loadOrderPhotoDetail fallback (known to work)
     const url = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listPhotos}/items`
       + `?$expand=fields&$top=500`;
     const res = await fetch(url, { headers:{ Authorization:`Bearer ${token}`, Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly' } });
-    if(!res.ok){ console.warn('fetchRainOrderStages HTTP', res.status); return {}; }
+    if(!res.ok){ console.warn('fetchRainPhotoCount HTTP', res.status); return {}; }
     const data = await res.json();
 
     const map = {};
     for(const item of (data.value||[])){
       const f = item.fields || {};
       if(f.Is_Deleted === true) continue;
-      const stg = f.Stage;
-      if(!stg) continue;
       let key = null;
-      if(f.Shipment_ID && sidSet.has(f.Shipment_ID))             key = f.Shipment_ID;
-      else if(f.GP_Order_Number && numSet.has(f.GP_Order_Number)) key = numToSid[f.GP_Order_Number] || f.GP_Order_Number;
+      if(f.Shipment_ID && sidSet.has(f.Shipment_ID))              key = f.Shipment_ID;
+      else if(f.GP_Order_Number && numSet.has(f.GP_Order_Number))  key = numToSid[f.GP_Order_Number] || f.GP_Order_Number;
       if(!key) continue;
-      if(!map[key]) map[key] = new Set();
-      map[key].add(stg);
+      map[key] = (map[key] || 0) + 1;
     }
     return map;
   }catch(e){
-    console.warn('fetchRainOrderStages failed:', e);
+    console.warn('fetchRainPhotoCount failed:', e);
     return {};
   }
 }
 
-function renderRainDashboard(orders, sheetMap, stageMap){
+function renderRainDashboard(orders, sheetMap, photoCountMap){
   const listEl = document.getElementById('rain-orders-list');
   if(!listEl) return;
   if(!orders.length){
@@ -1311,8 +1307,7 @@ function renderRainDashboard(orders, sheetMap, stageMap){
     return;
   }
 
-  const allStages = allKnownStages();
-  const fmtShort  = dt => dt ? new Date(dt).toLocaleDateString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : '—';
+  const fmtShort = dt => dt ? new Date(dt).toLocaleDateString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : '—';
 
   listEl.innerHTML = orders.map(f => {
     const orderNum    = String(f.GP_Order_Number||'');
@@ -1341,15 +1336,11 @@ function renderRainDashboard(orders, sheetMap, stageMap){
     const statusBg  = isOpen ? 'background:var(--green);color:#fff;' : 'background:var(--gray-lt);color:var(--gray-dk);';
     const statusBadge = `<span style="font-size:10px;font-weight:800;font-family:var(--font-cond);letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:20px;white-space:nowrap;${statusBg}">${isOpen?'In Progress':'Closed'}</span>`;
 
-    // ── Stage chips ───────────────────────────────────────────────
-    const stageKey = shipId || orderNum;
-    const stages   = stageMap[stageKey] ? [...stageMap[stageKey]] : [];
-    const stageHtml = stages.length
-      ? `<div class="rain-stage-chips">${stages.map(sid => {
-          const def = allStages.find(s=>s.id===sid) || allStages.find(s=>sid.startsWith(s.id+'_'));
-          const label = def ? def.icon + ' ' + def.label.split(' ')[0] : sid.replace(/^M_[CT]/,'');
-          return `<span class="rain-stage-chip">${label}</span>`;
-        }).join('')}</div>`
+    // ── Photo count ───────────────────────────────────────────────
+    const countKey  = shipId || orderNum;
+    const photoCount = photoCountMap[countKey] || 0;
+    const stageHtml  = photoCount > 0
+      ? `<div style="font-size:11px;color:var(--text-dim);margin:5px 0 2px;">📷 ${photoCount} photo${photoCount===1?'':'s'} taken</div>`
       : `<div style="font-size:11px;color:var(--text-muted);margin:5px 0 2px;">No photos yet</div>`;
 
     // ── Dates row ─────────────────────────────────────────────────
