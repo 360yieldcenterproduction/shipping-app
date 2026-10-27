@@ -1010,7 +1010,7 @@ const CFG = {
   // PartMaster + Locations are read-only here, so TEST and PROD share them.
   // PartLocations is the only list the app writes to, so it gets a _TEST copy.
   listPartMaster:    'PartMaster',
-  listLocations:     'Locations',
+  listLocations:     'PartMaster_Locations',
   listPartLocations: IS_TEST_ENV ? 'PartLocations_TEST' : 'PartLocations',
   spSiteUrl:     'https://encoregrowth.sharepoint.com/sites/WarehouseShipping',
   isTest:        IS_TEST_ENV,
