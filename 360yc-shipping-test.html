@@ -21,6 +21,7 @@
   --text:#1A1A1A; --text-dim:#5A5B5E; --text-muted:#9A9B9E;
   --green:#1B6E35; --green-lt:#E6F2EB; --green-mid:rgba(27,110,53,0.2);
   --amber:#A05C00; --amber-lt:#FEF3DC;
+  --blue:#1A56DB; --blue-lt:#EBF0FE;
   --radius:10px; --radius-sm:6px; --radius-lg:16px;
   --shadow-sm:0 1px 3px rgba(0,0,0,0.07),0 1px 2px rgba(0,0,0,0.05);
   --shadow:0 3px 12px rgba(0,0,0,0.09);
@@ -74,13 +75,18 @@ input,select{font-family:var(--font);outline:none;}
 /* ── CARDS ── */
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow-sm);}
 .card-label{font-family:var(--font-cond);font-size:10px;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted);margin-bottom:9px;}
+.rain-order-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:8px;box-shadow:var(--shadow-sm);cursor:pointer;transition:box-shadow .12s;}
+.rain-order-card:active{box-shadow:none;opacity:.9;}
+.rain-stage-chips{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0;}
+.rain-stage-chip{font-size:10px;font-family:var(--font-cond);font-weight:700;letter-spacing:.04em;padding:2px 7px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);color:var(--text-dim);white-space:nowrap;}
 
 /* ── FORMS ── */
 .field-group{display:flex;flex-direction:column;gap:5px;}
 .field-label{font-family:var(--font-cond);font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-dim);}
-input[type="text"],select{width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:17px;font-weight:500;padding:11px 13px;transition:border-color .15s,box-shadow .15s;-webkit-appearance:none;appearance:none;}
-input[type="text"]:focus,select:focus{border-color:var(--red);box-shadow:0 0 0 3px var(--red-glow);}
-input[type="text"]::placeholder{color:var(--text-muted);font-weight:400;}
+input[type="text"],select,textarea{width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:17px;font-weight:500;padding:11px 13px;transition:border-color .15s,box-shadow .15s;-webkit-appearance:none;appearance:none;}
+input[type="text"]:focus,select:focus,textarea:focus{border-color:var(--red);box-shadow:0 0 0 3px var(--red-glow);}
+input[type="text"]::placeholder,textarea::placeholder{color:var(--text-muted);font-weight:400;}
+textarea{font-family:var(--font);resize:none;line-height:1.4;}
 select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%236D6E71' d='M6 8L0 0h12z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 13px center;padding-right:34px;cursor:pointer;}
 
 /* ── BUTTONS ── */
@@ -116,13 +122,34 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 .cam-hint{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.65);color:#fff;font-family:var(--font-cond);font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;padding:5px 14px;border-radius:20px;white-space:nowrap;}
 #capture-canvas{display:none;}
 
+/* ── FULLSCREEN PHOTO CAMERA (stays open across multiple shots) ── */
+#photo-cam-wrap.cam-fullscreen{position:fixed;inset:0;z-index:6000;background:#000;display:flex;flex-direction:column;}
+.cam-fs-header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:calc(env(safe-area-inset-top,0) + 12px) 14px 10px;}
+.cam-fs-label{font-family:var(--font-cond);font-weight:800;font-size:15px;letter-spacing:0.02em;color:#fff;}
+.cam-fs-count{font-size:12px;color:rgba(255,255,255,0.6);margin-top:2px;}
+.cam-fs-video{flex:1;position:relative;overflow:hidden;background:#000;}
+.cam-fs-video video{width:100%;height:100%;object-fit:cover;display:block;}
+.cam-fs-flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;}
+.cam-fs-flash.flash{animation:camFlash .25s ease-out;}
+@keyframes camFlash{from{opacity:.85;}to{opacity:0;}}
+.cam-fs-footer{display:flex;align-items:center;justify-content:center;gap:26px;padding:18px 20px calc(env(safe-area-inset-bottom,0) + 20px);}
+.cam-fs-shutter{width:68px;height:68px;border-radius:50%;background:#fff;border:4px solid rgba(255,255,255,0.35);font-size:0;flex-shrink:0;}
+.cam-fs-shutter:active{transform:scale(.94);}
+.cam-fs-done{position:absolute;right:14px;bottom:calc(env(safe-area-inset-bottom,0) + 26px);}
+
 /* ── PHOTO GRID ── */
 .photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:9px;}
 .photo-thumb{position:relative;aspect-ratio:1;border-radius:var(--radius-sm);overflow:hidden;background:var(--surface2);border:1px solid var(--border);}
 .photo-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
 .thumb-label{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.62);font-family:var(--font-cond);font-size:9px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:#fff;padding:3px 4px;text-align:center;}
-.thumb-rm{position:absolute;top:3px;right:3px;width:19px;height:19px;background:var(--red);border-radius:50%;border:none;color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;line-height:1;}
-.thumb-rm:disabled{opacity:0.55;background:var(--gray);}
+.thumb-rm{position:absolute;top:3px;right:3px;width:22px;height:22px;background:var(--red);border-radius:50%;border:none;color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;line-height:1;opacity:0;transition:opacity .15s;}
+.photo-thumb:hover .thumb-rm{opacity:1;}
+.thumb-rm-pending{background:var(--gray);cursor:default;font-size:10px;opacity:1!important;}
+.thumb-rm-saved{background:rgba(0,0,0,.55);}
+.del-photo-modal{background:#fff;border-radius:var(--radius-lg);padding:28px 24px;max-width:360px;width:100%;box-shadow:var(--shadow-lg);border-top:4px solid var(--red);display:flex;flex-direction:column;gap:16px;}
+.del-photo-modal h3{font-family:var(--font-cond);font-size:22px;font-weight:900;text-transform:uppercase;letter-spacing:.04em;color:var(--text);}
+.del-photo-modal p{font-size:14px;color:var(--text-dim);line-height:1.5;}
+.del-photo-actions{display:flex;gap:10px;justify-content:flex-end;}
 
 /* ── STAGE CARDS (the new 5-card capture screen) ── */
 .stage-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-sm);overflow:hidden;}
@@ -138,6 +165,25 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 .stage-card.has-photos .stage-card-count{color:var(--green);}
 .stage-card-body{padding:0 14px 14px;}
 .stage-help{font-size:12px;color:var(--text-muted);line-height:1.5;margin-bottom:10px;}
+.stage-card.is-na .stage-card-header{border-left-color:var(--text-muted);opacity:0.55;}
+.stage-card.is-na .stage-card-body{opacity:0.55;}
+.btn-na{
+  width:100%;padding:7px;border:1px dashed var(--border);border-radius:var(--radius-sm);
+  background:transparent;color:var(--text-muted);font-size:12px;font-weight:600;
+  cursor:pointer;margin-top:6px;letter-spacing:0.02em;
+}
+.btn-na:hover{border-color:var(--text-muted);color:var(--text);}
+.btn-na.active{background:var(--gray-mid);color:var(--text);border-style:solid;}
+.lift-tag-chip{
+  display:inline-block;padding:6px 12px;border-radius:20px;font-size:14px;
+  border:1.5px solid var(--border);cursor:pointer;margin:3px 3px 0 0;
+  color:var(--text);background:var(--surface);user-select:none;
+}
+.lift-tag-chip.active{background:var(--green);color:#fff;border-color:var(--green);}
+.section-header-l{
+  font-family:var(--font-cond);font-size:10px;font-weight:900;letter-spacing:0.08em;
+  text-transform:uppercase;color:var(--text-muted);padding:4px 0 8px;
+}
 
 /* ── BADGES ── */
 .badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-family:var(--font-cond);font-size:10px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;}
@@ -145,6 +191,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 .badge-green{background:var(--green-lt);color:var(--green);border:1px solid var(--green-mid);}
 .badge-gray{background:var(--gray-lt);color:var(--gray-dk);border:1px solid var(--gray-mid);}
 .badge-amber{background:var(--amber-lt);color:var(--amber);border:1px solid rgba(160,92,0,0.2);}
+.badge-blue{background:var(--blue-lt);color:var(--blue);border:1px solid rgba(26,86,219,0.2);}
 
 /* ── PROGRESS SUMMARY ── */
 .progress-summary{
@@ -380,6 +427,14 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 .dup-divider{display:flex;align-items:center;gap:8px;margin:6px 0;}
 .dup-divider::before,.dup-divider::after{content:'';flex:1;height:1px;background:var(--border);}
 .dup-divider span{font-family:var(--font-cond);font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted);white-space:nowrap;}
+/* ── PARTS LOOKUP ── */
+.loc-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 0;border-bottom:1px solid var(--border);}
+.loc-row:last-child{border-bottom:none;}
+.loc-name{font-family:var(--font-cond);font-size:18px;font-weight:800;letter-spacing:0.02em;color:var(--black);}
+.loc-sub{font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--red);margin-left:8px;}
+.loc-del{background:transparent;border:1.5px solid var(--border);color:var(--text-muted);border-radius:var(--radius-sm);width:36px;height:36px;font-size:15px;flex-shrink:0;}
+.loc-del:hover{border-color:var(--red);color:var(--red);}
+.part-row-desc{font-size:12px;color:var(--text-dim);line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 </style>
 </head>
 <body>
@@ -448,6 +503,98 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <button class="btn btn-outline" onclick="showRecentOrders()" style="margin-top:0;">
       🕐 &nbsp;Recent Orders
     </button>
+    <button class="btn btn-outline" onclick="openRainDashboard()" style="margin-top:0;border-color:var(--green);color:var(--green);">
+      🌧️ &nbsp;Open RAIN Orders
+    </button>
+    <button class="btn btn-outline" onclick="openPartsLookup()" style="margin-top:0;border-color:var(--blue);color:var(--blue);">
+      📍 &nbsp;Parts Lookup
+    </button>
+    <div class="bottom-safe"></div>
+  </div>
+</div>
+
+<!-- ══ RAIN ORDERS DASHBOARD ══ -->
+<div id="screen-rain-orders" class="screen">
+  <div class="app-header">
+    <div class="h-left">
+      <button class="back-btn" onclick="goBack('screen-scan')">← Back</button>
+      <div class="h-sub" style="color:rgba(255,255,255,0.7);">Open RAIN Orders</div>
+    </div>
+    <div class="h-right">
+      <button class="btn-icon" title="Refresh" onclick="loadRainDashboard()">↻</button>
+      <div class="user-chip"><div class="user-av" id="av-rain"></div><div class="user-name" id="nm-rain"></div></div>
+    </div>
+  </div>
+  <div class="screen-body">
+    <div class="card" style="padding:10px 14px;border-left:3px solid var(--green);">
+      <p style="font-size:12px;color:var(--text-dim);line-height:1.5;">
+        In Progress orders + orders shipped within the last 3 days. Tap any row to open it.
+      </p>
+    </div>
+    <div id="rain-orders-list">
+      <div class="empty-state"><div class="empty-icon">⏳</div>Loading…</div>
+    </div>
+    <div class="bottom-safe"></div>
+  </div>
+</div>
+
+<!-- ══ PARTS LOOKUP — SEARCH ══ -->
+<div id="screen-parts" class="screen">
+  <div class="app-header">
+    <div class="h-left">
+      <button class="back-btn" onclick="goBack('screen-scan')">← Back</button>
+      <div class="h-sub" style="color:rgba(255,255,255,0.7);">Parts</div>
+    </div>
+    <div class="h-right">
+      <div class="user-chip"><div class="user-av" id="av-parts"></div><div class="user-name" id="nm-parts"></div></div>
+    </div>
+  </div>
+  <div class="screen-body">
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="parts-search" placeholder="Part number…" autocomplete="off" autocapitalize="characters"
+        oninput="onPartsSearchInput(this)" onkeydown="if(event.key==='Enter')searchPartsNow()"
+        style="text-transform:uppercase;"/>
+    </div>
+    <div id="parts-list"></div>
+    <div class="bottom-safe"></div>
+  </div>
+</div>
+
+<!-- ══ PARTS LOOKUP — PART DETAIL ══ -->
+<div id="screen-part" class="screen">
+  <div class="app-header">
+    <div class="h-left">
+      <button class="back-btn" onclick="goBack('screen-parts')">← Back</button>
+      <div class="h-sub" id="part-header-num">Part</div>
+    </div>
+  </div>
+  <div class="screen-body">
+    <div class="card" style="border-top:3px solid var(--red);">
+      <div class="card-label">Part</div>
+      <div class="detail-meta-row"><span class="detail-meta-lbl">Part Number</span><span class="detail-meta-val mono" id="part-num">—</span></div>
+      <div class="detail-meta-row"><span class="detail-meta-lbl">Description</span><span class="detail-meta-val" id="part-desc">—</span></div>
+      <div class="detail-meta-row"><span class="detail-meta-lbl">Class</span><span class="detail-meta-val" id="part-class">—</span></div>
+      <div class="detail-meta-row" id="part-weight-row"><span class="detail-meta-lbl">Weight</span><span class="detail-meta-val" id="part-weight">—</span></div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Assigned Locations</div>
+      <div id="part-locs"><div class="empty-state" style="padding:18px;">Loading…</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Add Location</div>
+      <div class="field-group" style="margin-bottom:10px;">
+        <div class="field-label">Location</div>
+        <select id="part-loc-select" onchange="onPartLocChange()"><option value="">— Select a location —</option></select>
+      </div>
+      <div class="field-group" id="part-sub-wrap" style="margin-bottom:12px;display:none;">
+        <div class="field-label">Sublocation</div>
+        <select id="part-sub-select"><option value="">— Select a sublocation —</option></select>
+      </div>
+      <button class="btn btn-primary" onclick="addPartLocation()">＋ &nbsp;Add Location</button>
+    </div>
     <div class="bottom-safe"></div>
   </div>
 </div>
@@ -513,6 +660,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <div class="detail-meta-row"><span class="detail-meta-lbl">Packed By</span><span class="detail-meta-val" id="detail-packed-by">—</span></div>
       <div class="detail-meta-row"><span class="detail-meta-lbl">Started</span><span class="detail-meta-val" id="detail-started">—</span></div>
       <div class="detail-meta-row"><span class="detail-meta-lbl">Completed</span><span class="detail-meta-val" id="detail-completed">—</span></div>
+      <div class="detail-meta-row"><span class="detail-meta-lbl">Notes</span><span class="detail-meta-val" id="detail-comment">—</span></div>
     </div>
     <div id="detail-stages">
       <div class="empty-state"><div class="empty-icon">⏳</div>Loading photos…</div>
@@ -520,7 +668,10 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <div class="reopen-divider">
       <div class="reopen-divider-text">Make changes to this order</div>
     </div>
-    <button class="btn btn-outline" onclick="startReopenFlow()" style="border-color:var(--amber);color:var(--amber);">
+    <button class="btn btn-primary" id="btn-continue-shipment" onclick="continueShipment()" style="display:none;">
+      ▶ &nbsp;Continue Shipment
+    </button>
+    <button class="btn btn-outline" id="btn-reopen-shipment" onclick="startReopenFlow()" style="border-color:var(--amber);color:var(--amber);">
       ✏️ &nbsp;Re-open Order to Add Photos
     </button>
     <button class="btn btn-outline" onclick="startDeleteShipment()" style="border-color:var(--red);color:var(--red);margin-top:8px;">
@@ -584,17 +735,28 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   </div>
   <div class="screen-body">
     <div class="confirm-hero">
-      <div class="confirm-hero-sub">GP Order Number</div>
+      <div class="confirm-hero-sub" id="confirm-hero-sub">GP Order Number</div>
       <div class="confirm-hero-num" id="confirm-num">—</div>
     </div>
+    <!-- RAIN Machine type selector (hidden for non-RAIN orders) -->
+    <div id="rain-type-card" class="card" style="display:none;border-top:3px solid var(--green);">
+      <div class="card-label" style="color:var(--green);">🌧️ &nbsp;RAIN Machine — Select Shipping Method</div>
+      <div class="btn-row" style="gap:10px;">
+        <button class="btn btn-outline" id="btn-rain-trailer" onclick="selectRainType('Trailer')" style="flex:1;">🚛&nbsp;Trailer</button>
+        <button class="btn btn-outline" id="btn-rain-container" onclick="selectRainType('Container')" style="flex:1;">🚢&nbsp;Container</button>
+      </div>
+      <div id="rain-type-hint" style="text-align:center;font-size:12px;color:var(--text-muted);margin-top:8px;">Select a shipping method before tapping "Confirm &amp; Continue"</div>
+    </div>
+
     <div class="card">
       <div class="card-label">Verify before continuing</div>
-      <p style="font-size:13px;color:var(--text-dim);line-height:1.6;margin-bottom:13px;">Confirm this order number matches your picking ticket. All photos will be filed under this number.</p>
+      <p id="confirm-help-text" style="font-size:13px;color:var(--text-dim);line-height:1.6;margin-bottom:13px;">Confirm this order number matches your picking ticket. All photos will be filed under this number.</p>
       <div class="btn-row">
         <button class="btn btn-outline" onclick="goBack('screen-scan')" style="flex:1;">← Re-scan</button>
         <button class="btn btn-primary" onclick="startCapture()" style="flex:2;">Confirm & Continue →</button>
       </div>
     </div>
+
     <div class="bottom-safe"></div>
   </div>
 </div>
@@ -629,24 +791,37 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <div class="progress-pip-row" id="progress-pips"></div>
     </div>
 
-    <!-- CAMERA (hidden until active) -->
-    <div id="photo-cam-wrap" style="display:none;">
-      <div class="card" style="padding:11px;">
-        <div class="card-label" id="cam-stage-label">Photo</div>
-        <div class="camera-wrap">
-          <video id="photo-video" autoplay playsinline muted></video>
-          <div class="cam-overlay"><div class="cam-xhair-sq"></div></div>
+    <!-- CAMERA (hidden until active) — fullscreen overlay, stays open across multiple shots -->
+    <div id="photo-cam-wrap" class="cam-fullscreen" style="display:none;">
+      <div class="cam-fs-header">
+        <div>
+          <div class="cam-fs-label" id="cam-stage-label">Photo</div>
+          <div class="cam-fs-count" id="cam-shot-count"></div>
         </div>
-        <div class="btn-row" style="margin-top:9px;">
-          <button class="btn btn-outline" onclick="stopPhotoCamera()">✕ Cancel</button>
-          <button class="btn btn-primary" onclick="capturePhoto()">📸 Capture</button>
-        </div>
-        <canvas id="capture-canvas"></canvas>
+        <button class="btn-icon" onclick="stopPhotoCamera()" title="Close camera">✕</button>
       </div>
+      <div class="cam-fs-video">
+        <video id="photo-video" autoplay playsinline muted></video>
+        <div class="cam-overlay"></div>
+        <div class="cam-fs-flash" id="cam-fs-flash"></div>
+      </div>
+      <div class="cam-fs-footer">
+        <button class="cam-fs-shutter" onclick="capturePhoto()" aria-label="Capture photo">📸</button>
+        <button class="btn btn-primary cam-fs-done" style="width:auto;padding:10px 18px;" onclick="stopPhotoCamera()">Done</button>
+      </div>
+      <canvas id="capture-canvas"></canvas>
+      <input type="file" id="photo-upload-input" accept="image/*" multiple style="display:none" onchange="handlePhotoUpload(event)">
     </div>
 
     <!-- Stage cards rendered here -->
     <div id="stage-cards"></div>
+
+    <!-- Order Notes (optional, appears after the 5 stage cards) -->
+    <div class="card" id="order-notes-card">
+      <div class="card-label">Order Notes <span style="text-transform:none;font-weight:500;letter-spacing:0;color:var(--text-muted);">(optional)</span></div>
+      <textarea id="order-comment" maxlength="100" rows="2" placeholder="Add a note about this order — damage, shortage, special instructions…" oninput="updateCommentCounter()"></textarea>
+      <div style="text-align:right;font-size:11px;color:var(--text-muted);margin-top:4px;" id="comment-counter">0/100</div>
+    </div>
 
     <!-- Submit -->
     <button class="btn btn-primary" id="btn-submit" onclick="submitShipment()" disabled style="opacity:0.5;">
@@ -655,6 +830,9 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <p id="submit-help" style="font-size:11px;color:var(--text-muted);text-align:center;line-height:1.5;margin-top:-2px;">
       All 5 stages need at least 1 photo to complete.
     </p>
+    <button class="btn btn-outline" id="btn-save-later" onclick="saveForLater()" style="display:none;margin-top:4px;">
+      💾 &nbsp;Save &amp; Come Back Later
+    </button>
 
     <div class="bottom-safe"></div>
   </div>
@@ -691,8 +869,18 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 <!-- ══ DUPLICATE ORDER DIALOG ══ -->
 <div id="dup-dialog-bg">
   <div id="dup-dialog">
-    <h3>⚠️ Previous Shipment Found</h3>
+    <h3 id="dup-dialog-title">Previous Shipment Found</h3>
     <div class="dup-sub" id="dup-sub-text">This order number has been used before. Select what you'd like to do:</div>
+
+    <!-- Shipping label primary CTA — shown when most-recent shipment is Complete or Shipped -->
+    <div id="dup-label-action" style="display:none;margin-bottom:4px;">
+      <button class="btn btn-success" onclick="dupAddShippingLabel()" style="font-size:15px;gap:8px;">
+        🏷️ &nbsp;Add Shipping Label Photos
+      </button>
+      <div id="dup-label-sub" style="font-size:12px;color:var(--text-muted);text-align:center;margin-top:6px;line-height:1.4;"></div>
+    </div>
+    <div class="dup-divider" id="dup-label-divider" style="display:none;"><span>or</span></div>
+
     <div class="dup-shipment-list" id="dup-shipment-list"></div>
     <div id="dup-selected-actions" style="display:none;">
       <div class="dup-action-label">With selected shipment:</div>
@@ -701,7 +889,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
           👁 &nbsp;View This Shipment (read-only)
         </button>
         <button class="btn btn-outline" onclick="dupAddToExisting()" style="font-size:14px;border-color:var(--amber);color:var(--amber);">
-          ✏️ &nbsp;Add Photos to This Shipment
+          ✏️ &nbsp;Re-open for Packing Photos
         </button>
       </div>
     </div>
@@ -730,6 +918,18 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <div class="btn-row">
       <button class="btn btn-outline" onclick="closeDialog()">Cancel</button>
       <button class="btn btn-primary" id="dialog-confirm-btn">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Photo confirmation -->
+<div id="del-photo-modal-bg" style="position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:9000;padding:20px;">
+  <div class="del-photo-modal">
+    <h3>Delete this photo?</h3>
+    <p>This permanently removes the photo from SharePoint. This action cannot be undone.</p>
+    <div class="del-photo-actions">
+      <button class="btn btn-outline" onclick="cancelDeletePhoto()">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmDeletePhoto()">Delete</button>
     </div>
   </div>
 </div>
@@ -806,6 +1006,12 @@ const CFG = {
   listShipments: IS_TEST_ENV ? 'Shipments_TEST'             : 'Shipments',
   listPhotos:    IS_TEST_ENV ? 'Shipment_Stage_Photos_TEST' : 'Shipment_Stage_Photos',
   photoLibrary:  'ShipmentPhotos',  // shared across TEST and PROD
+  // ── Parts Lookup (WMS) ──────────────────────────────────
+  // PartMaster + Locations are read-only here, so TEST and PROD share them.
+  // PartLocations is the only list the app writes to, so it gets a _TEST copy.
+  listPartMaster:    'PartMaster',
+  listLocations:     'Locations',
+  listPartLocations: IS_TEST_ENV ? 'PartLocations_TEST' : 'PartLocations',
   spSiteUrl:     'https://encoregrowth.sharepoint.com/sites/WarehouseShipping',
   isTest:        IS_TEST_ENV,
 };
@@ -814,16 +1020,100 @@ const CFG = {
 // Used for: choice values in SharePoint, folder names, UI labels.
 // Order here drives display order and progress pips.
 const STAGES = [
-  {id:'Cart',          label:'Cart Photos',     icon:'🛒',
+  {id:'Cart',          label:'Cart Photos',     icon:'🛒', canSkip:true,
    help:'Photos of all order components gathered on your cart or table — before they go into boxes.'},
-  {id:'OpenBoxes',     label:'Open Boxes',      icon:'📦',
+  {id:'OpenBoxes',     label:'Open Boxes',      icon:'📦', canSkip:true,
    help:'Photos of components placed in their boxes/pallets, before sealing.'},
-  {id:'WrappedReady',  label:'Wrapped & Ready', icon:'🚚',
+  {id:'WrappedReady',  label:'Wrapped & Ready', icon:'🚚', canSkip:false,
    help:'Final photos of sealed/wrapped boxes or pallets ready for the dock.'},
-  {id:'PickingTicket', label:'Picking Ticket',  icon:'📋',
+  {id:'PickingTicket', label:'Picking Ticket',  icon:'📋', canSkip:false,
    help:'One photo per page — add multiple if the picking ticket has more than one page.'},
-  {id:'AuditSheet',    label:'Audit Sheet',     icon:'📝',
+  {id:'AuditSheet',    label:'Audit Sheet',     icon:'📝', canSkip:false,
    help:'One photo per page — add multiple if the audit sheet has more than one page.'},
+];
+
+const LABEL_STAGE = {
+  id:'ShippingLabel', label:'Shipping Label', icon:'🏷️',
+  help:'Photo of the shipping label affixed to the package — taken at the dock before loading on the truck.',
+};
+
+// ── CONTROL PANEL / SKID WORKFLOW (triggered by "-L" order suffix) ──────────
+const STAGES_L = [
+  {id:'InsidePanel',   label:'Inside Panel',            icon:'🔧', canSkip:true,
+   help:'Photo of the inside of the panel — skip if not applicable for this unit.'},
+  {id:'PumpSide',      label:'Pump Side',               icon:'🔧', canSkip:true,
+   help:'Photo of the pump side of the panel — skip if not applicable.'},
+  {id:'SupplySide',    label:'Panel Side',              icon:'🔧', canSkip:true,
+   help:'Photo of the panel side — skip if not applicable.'},
+  {id:'PanelInterior', label:'Panel Interior Close Ups',icon:'🔍', canSkip:true,
+   help:'Close-up photos of the panel interior components — skip if not applicable.'},
+  {id:'PackedItems',   label:'Packed Items',            icon:'📦', canSkip:false,
+   help:'Photos of all packed items before wrapping.'},
+  {id:'WrappedReady',  label:'Wrapped & Ready',         icon:'📦', canSkip:false,
+   help:'Final photos of the unit wrapped and ready for the dock.'},
+  {id:'WorkOrder',     label:'Work Order',              icon:'📋', canSkip:false,
+   help:'Photo of the Google Sheet work order document for this unit.'},
+  {id:'PickingTicket', label:'GP Picking Ticket',       icon:'🎫', canSkip:false,
+   help:'One photo per page of the GP picking ticket.'},
+  {id:'AuditSheet',    label:'Audit Sheet',             icon:'📝', canSkip:false,
+   help:'One photo per page of the completed audit sheet.'},
+];
+
+// ── LIFT TAGS (predefined list for container lifts) ──────────────────────────
+const LIFT_TAGS = [
+  'Boom Extension','Booms','Crate','Dispenser','Drop Assembly(s)',
+  'Fan Drops','Fertilizer Pump','Front Drop Assembly(s)','Front Leg Pallet',
+  'Fuel Tanks','Hose Coil','Machine & Frame','Panel','Pontoon',
+  'Skid','Tire','Wheel Shield / Dispenser Shield','Wire',
+];
+
+// ── RAIN MACHINE WORKFLOW ─────────────────────────────────────────────────────
+// Container flow: Build (optional) → Container Number → Lifts → Final Packed → Seal
+const STAGES_M_BUILD_CONTAINER = [
+  {id:'M_CBuild',      label:'Build Photos',      icon:'🔨', canSkip:true,
+   help:'Assembly build photos — skip if this step is not needed.'},
+];
+const STAGES_M_LOAD_CONTAINER = [
+  {id:'M_CNumber',     label:'Container Number',  icon:'📦', canSkip:false,
+   help:'Photo of the container number painted on the outside of the container.'},
+  {id:'M_CLifts',      label:'Lift Photos',       icon:'🏗️', canSkip:true,
+   help:'Add a lift for each item loaded into the container. Enter the lift number, add optional tags, then capture photos. Multiple photos per lift are allowed.'},
+  {id:'M_CFinalPacked',label:'Final Packed',      icon:'✅', canSkip:false,
+   help:'Photos of the machine fully packed and secured in the container.'},
+  {id:'M_CSeal_Close', label:'Container Seal — Up Close', icon:'🔒', canSkip:false,
+   help:'Close-up photo of the seal number clearly visible.'},
+  {id:'M_CSeal_Doors', label:'Container Seal — Doors Affixed', icon:'🚪', canSkip:false,
+   help:'Photo of the container seal affixed and visible.'},
+];
+
+// Trailer flow: Build (optional) → Open Crate sub-stages → Loaded Crate → Machine docs
+const STAGES_M_BUILD_TRAILER = [
+  {id:'M_TBuild',         label:'Build Photos',                    icon:'🔨', canSkip:true,
+   help:'Build phase photos — add as many as needed, skip if not applicable.'},
+];
+const STAGES_M_LOAD_TRAILER = [
+  {id:'M_TOpenCrate_Drops',   label:'Open Crate — Drops',         icon:'📦', canSkip:true,
+   help:'Photo of Drops in the open crate before sealing.'},
+  {id:'M_TOpenCrate_Planter', label:'Open Crate — Planter Kit',   icon:'🌱', canSkip:true,
+   help:'Photo of the Planter Kit in the open crate.'},
+  {id:'M_TOpenCrate_Base',    label:'Open Crate — Base Station',  icon:'📡', canSkip:true,
+   help:'Photo of the Base Station in the open crate.'},
+  {id:'M_TOpenCrate_Shields', label:'Open Crate — Wheel Shields', icon:'🛡️', canSkip:true,
+   help:'Photo of the Wheel Shields in the open crate.'},
+  {id:'M_TOpenCrate_Other',   label:'Open Crate — Other',         icon:'📦', canSkip:true,
+   help:'Any additional contents in the open crate.'},
+  {id:'M_TLoadedCrate_Lid',   label:'Loaded Crate — Lid',         icon:'📦', canSkip:true,
+   help:'Photo of the loaded and sealed crate lid.'},
+  {id:'M_TLoadedCrate_Serial',label:'Loaded Crate — Last 3 of Serial #', icon:'🔢', canSkip:true,
+   help:'Photo showing the last 3 digits of the serial number marked on the crate.'},
+  {id:'M_TMachine_Serial',    label:'Machine Serial # Tag',        icon:'🏷️', canSkip:true,
+   help:'Photo of the machine serial number tag.'},
+  {id:'M_TMachine_Side',      label:'Side View Loaded',            icon:'📸', canSkip:true,
+   help:'Side view of the entire loaded shipment on the trailer.'},
+  {id:'M_TMachine_Rear',      label:'Rear View',                   icon:'📸', canSkip:true,
+   help:'Rear view of the loaded shipment.'},
+  {id:'M_TMachine_Strapping', label:'Strapping',                   icon:'🔗', canSkip:true,
+   help:'Photo showing all strapping and tie-downs securing the load.'},
 ];
 
 if(IS_TEST_ENV){
@@ -838,7 +1128,7 @@ if(IS_TEST_ENV){
 //  MSAL
 // ═══════════════════════════════════════════════════
 let msalApp = null;
-const loginScopes = ['User.Read'];
+const loginScopes = ['User.Read','Sites.ReadWrite.All','Files.ReadWrite.All'];
 const graphScopes = ['User.Read','Sites.ReadWrite.All','Files.ReadWrite.All'];
 
 // ═══════════════════════════════════════════════════
@@ -849,12 +1139,13 @@ const graphScopes = ['User.Read','Sites.ReadWrite.All','Files.ReadWrite.All'];
 // ═══════════════════════════════════════════════════
 let S = {
   user:null, token:null,
-  orderNum:null,
+  orderNum:null,          // full order number stored in SharePoint (may include -L)
+  displayOrderNum:null,   // order number shown in UI (L suffix stripped)
   shipmentId:null,        // e.g. ORDR00050014-S1
   shipmentSeq:null,
   shipmentItemId:null,    // SharePoint list item ID for the Shipments row
   // stages keyed by stage.id
-  // each: { photos:[dataUrl], savedCount:int, savedUrls:[spWebUrl|null] }
+  // each: { photos:[dataUrl], savedCount:int, savedUrls:[spWebUrl|null], na:bool }
   stages: {},
   // Camera state
   scanStream:null, photoStream:null, photoTargetStage:null,
@@ -862,9 +1153,23 @@ let S = {
   spSiteId:null, spDriveId:null,
   // Reopen flow
   isReopen:false, reopenCode:'', reopenNote:'',
+  // Shipping label flow
+  isShippingLabel:false,
+  // Control Panel / Skid workflow (order number ends with -L)
+  isLWorkflow:false,
+  // RAIN Machine workflow (detected via Google Sheet lookup; stored with -MC or -MT suffix)
+  isRainWorkflow:false,
+  rainShipType:null,   // 'Container' | 'Trailer'
+  // Order-level comment (optional, set on capture screen after Audit Sheet)
+  orderComment:'',
+  // Blob-URL cache for previously-saved photos: { spWebUrl: objectUrl }.
+  // Saved photos are stored as plain SharePoint URLs, which can't be used
+  // directly as an <img src> since the browser has no Graph auth context —
+  // validateSavedPhotos() fetches an authenticated thumbnail and caches it here.
+  savedThumbCache: {},
 };
 
-let dupState = { shipments:[], selected:null, orderNum:null };
+let dupState = { shipments:[], selected:null, orderNum:null, labelTarget:null };
 let recentState = {
   allOrders: [],
   filtered:  [],
@@ -872,12 +1177,504 @@ let recentState = {
   selectedOrder: null,
 };
 
-function emptyStages(){
+function updateCommentCounter(){
+  const el = document.getElementById('order-comment');
+  const counter = document.getElementById('comment-counter');
+  if(el && counter) counter.textContent = `${el.value.length}/100`;
+}
+
+function activeStages(){
+  if(S.isRainWorkflow){
+    if(S.rainShipType==='Container') return [...STAGES_M_BUILD_CONTAINER,...STAGES_M_LOAD_CONTAINER];
+    if(S.rainShipType==='Trailer')   return [...STAGES_M_BUILD_TRAILER,...STAGES_M_LOAD_TRAILER];
+    return [];
+  }
+  return S.isLWorkflow ? STAGES_L : STAGES;
+}
+
+function allKnownStages(){
+  return [...STAGES,...STAGES_L,
+          ...STAGES_M_BUILD_CONTAINER,...STAGES_M_LOAD_CONTAINER,
+          ...STAGES_M_BUILD_TRAILER,...STAGES_M_LOAD_TRAILER,
+          LABEL_STAGE];
+}
+
+// Detect workflow type from a stored order number suffix.
+// Returns { type: 'L'|'MC'|'MT'|'standard', display: <suffix-stripped number> }
+function detectWorkflow(num){
+  if(num.endsWith('-L'))  return {type:'L',        display:num.slice(0,-2)};
+  if(num.endsWith('-MC')) return {type:'MC',        display:num.slice(0,-3)};
+  if(num.endsWith('-MT')) return {type:'MT',        display:num.slice(0,-3)};
+  return                         {type:'standard',  display:num};
+}
+
+function applyWorkflowState(wf){
+  S.isLWorkflow    = wf.type==='L';
+  S.isRainWorkflow = wf.type==='MC'||wf.type==='MT';
+  S.rainShipType   = wf.type==='MC'?'Container':wf.type==='MT'?'Trailer':null;
+  S.displayOrderNum = wf.display;
+}
+
+// Parses one line of CSV, handling quoted fields that contain commas.
+function parseCSVRow(line){
+  const out = []; let cur = '', inQ = false;
+  for(let i = 0; i < line.length; i++){
+    const c = line[i];
+    if(c === '"'){
+      if(inQ && line[i+1] === '"'){ cur += '"'; i++; }
+      else inQ = !inQ;
+    } else if(c === ',' && !inQ){
+      out.push(cur); cur = '';
+    } else { cur += c; }
+  }
+  out.push(cur);
+  return out;
+}
+
+// Infer RAIN ship type from photo stage IDs (fallback for orders stored without suffix).
+function inferRainTypeFromPhotos(photos){
+  for(const p of photos){
+    const sid = String(p.Stage||'');
+    if(sid.startsWith('M_C')) return 'Container';
+    if(sid.startsWith('M_T')) return 'Trailer';
+  }
+  return null;
+}
+
+// ── RAIN Orders Dashboard ────────────────────────────────────────────────────
+
+function companionAutoTag(letter){
+  if(!letter) return '';
+  const l = String(letter).toUpperCase();
+  if(l === 'A') return 'Base Station / Remote / Comms';
+  if(l === 'B') return 'B Order';
+  return l + ' Order';
+}
+
+// Fetch the published CSV and build a map: { "ORDR00050688": {workOrder:"2027-01", dealer:"Acme"} }
+async function fetchRainSheetMap(){
+  const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRyTgWYqxTowKZALIFQ4MAotGIu3N7llTWPTHdVncba-7-pRN7lAWRovFTzD4RXrXO19D9Vaw4ejfyM/pub?gid=0&single=true&output=csv';
+  try{
+    const res = await fetch(CSV_URL);
+    if(!res.ok) return {};
+    const text = await res.text();
+    const map = {};
+    text.split('\n').forEach((line, idx) => {
+      if(idx === 0) return; // skip header
+      const cols = parseCSVRow(line);
+      const key = String(cols[10]||'').trim().toUpperCase(); // col K = base ORDR
+      if(key){
+        map[key] = {
+          workOrder: String(cols[0]||'').trim(),   // col A
+          dealer:    String(cols[5]||'').trim(),   // col F
+        };
+      }
+    });
+    return map;
+  }catch(e){
+    console.warn('fetchRainSheetMap failed:', e);
+    return {};
+  }
+}
+
+async function openRainDashboard(){
+  // Sync avatar/name from current session state
+  const avEl = document.getElementById('av-rain');
+  const nmEl = document.getElementById('nm-rain');
+  if(avEl && S.userName){ avEl.textContent = S.userName.charAt(0).toUpperCase(); }
+  if(nmEl && S.userName){ nmEl.textContent = S.userName.split(' ')[0]; }
+  showScreen('screen-rain-orders');
+  await loadRainDashboard();
+}
+
+async function loadRainDashboard(){
+  const listEl = document.getElementById('rain-orders-list');
+  if(listEl) listEl.innerHTML = '<div class="empty-state"><div class="empty-icon">⏳</div>Loading…</div>';
+  try{
+    const token = await getToken();
+    await ensureSpIds(token);
+
+    // Fetch all RAIN shipments (-MC and -MT suffixes)
+    // We use OR filter: status in (In Progress, Shipped) and orderNum ends with -MC or -MT
+    // SharePoint doesn't support endsWith, so we fetch recent and filter client-side.
+    const filterExpr = `fields/Status ne 'Cancelled'`;
+    const url = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listShipments}/items`+
+      `?$expand=fields&$filter=${encodeURIComponent(filterExpr)}&$top=500&$orderby=fields/Created desc`;
+
+    const res = await fetch(url, {
+      headers:{ Authorization:`Bearer ${token}`, Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly' }
+    });
+    if(!res.ok) throw new Error(`SP fetch failed: ${res.status}`);
+    const data = await res.json();
+
+    const now = Date.now();
+    const cutoffMs = now - 3*24*60*60*1000;
+
+    const rainOrders = (data.value||[])
+      .map(i => i.fields)
+      .filter(f => f.Is_Deleted !== true)
+      .filter(f => {
+        const num = String(f.GP_Order_Number||'');
+        return num.endsWith('-MC') || num.endsWith('-MT') || !!f.Order_Suffix;
+      })
+      .filter(f => {
+        const status = f.Status || '';
+        if(status === 'In Progress') return true;
+        if(status === 'Cancelled') return false;
+        // Any terminal status (Shipped, Completed, Complete, etc.) — only show if recent
+        const shipped = new Date(f.Shipped_DateTime || f.Shipped_Date || f.Modified).getTime();
+        return shipped >= cutoffMs;
+      });
+
+    // Sort: In Progress first, then by start date descending
+    rainOrders.sort((a, b) => {
+      const aIP = (a.Status||'') === 'In Progress';
+      const bIP = (b.Status||'') === 'In Progress';
+      if(aIP !== bIP) return aIP ? -1 : 1;
+      return new Date(b.Started_DateTime||b.Created||0) - new Date(a.Started_DateTime||a.Created||0);
+    });
+
+    const [sheetMap, stageMap] = await Promise.all([
+      fetchRainSheetMap(),
+      fetchRainPhotoCount(token, rainOrders),
+    ]);
+    renderRainDashboard(rainOrders, sheetMap, stageMap);
+  }catch(e){
+    console.error('loadRainDashboard error:', e);
+    const listEl = document.getElementById('rain-orders-list');
+    if(listEl) listEl.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><div>${e.message}</div></div>`;
+  }
+}
+
+async function fetchRainPhotoCount(token, orders){
+  if(!orders.length) return {};
+  // One request per order — same pattern as loadOrderPhotoDetail (proven to work)
+  const map = {};
+  const headers = { Authorization:`Bearer ${token}`, Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly' };
+  const baseUrl = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listPhotos}/items`;
+  await Promise.all(orders.map(async o => {
+    const sid = o.Shipment_ID;
+    const num = o.GP_Order_Number;
+    const key = sid || num;
+    if(!key) return;
+    try{
+      const filterExpr = sid
+        ? `fields/Shipment_ID eq '${sid.replace(/'/g,"''")}'`
+        : `fields/GP_Order_Number eq '${num.replace(/'/g,"''")}'`;
+      let res = await fetch(`${baseUrl}?$expand=fields&$filter=${encodeURIComponent(filterExpr)}&$top=500`, { headers });
+      let data;
+      if(res.ok){
+        data = await res.json();
+      } else {
+        const fb = await fetch(`${baseUrl}?$expand=fields&$top=500`, { headers });
+        if(!fb.ok) return;
+        data = await fb.json();
+      }
+      const count = (data.value||[]).filter(p => {
+        if(p.fields?.Is_Deleted === true) return false;
+        return sid ? p.fields?.Shipment_ID === sid : p.fields?.GP_Order_Number === num;
+      }).length;
+      if(count > 0) map[key] = count;
+    }catch(e){ console.warn('fetchRainPhotoCount order error:', key, e); }
+  }));
+  return map;
+}
+
+function renderRainDashboard(orders, sheetMap, photoCountMap){
+  const listEl = document.getElementById('rain-orders-list');
+  if(!listEl) return;
+  if(!orders.length){
+    listEl.innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div><div>No open RAIN orders</div></div>';
+    return;
+  }
+
+  const fmtShort = dt => dt ? new Date(dt).toLocaleDateString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : '—';
+
+  listEl.innerHTML = orders.map(f => {
+    const orderNum    = String(f.GP_Order_Number||'');
+    const baseNum     = orderNum.replace(/-MC$/i,'').replace(/-MT$/i,'').replace(/-L$/i,'');
+    const suffix      = f.Order_Suffix || (()=>{ const m=baseNum.match(/([A-Z])$/i); return m?m[1].toUpperCase():''; })();
+    const isCompanion = !!suffix;
+    const status      = f.Status || 'In Progress';
+    const isOpen      = status === 'In Progress';
+    const shipId      = f.Shipment_ID || '';
+
+    // ── Identity row ──────────────────────────────────────────────
+    let accentColor, typeLabel, nameLabel;
+    if(isCompanion){
+      accentColor = 'var(--amber)';
+      typeLabel   = `🔗 ${suffix} Order — ${companionAutoTag(suffix)}`;
+      nameLabel   = baseNum.replace(/[A-Z]$/i,'');
+    } else {
+      accentColor = 'var(--green)';
+      const sheet = sheetMap[baseNum.replace(/[A-Z]$/i,'').toUpperCase()] || {};
+      nameLabel   = (sheet.workOrder||'') + (sheet.workOrder&&sheet.dealer?' — ':'') + (sheet.dealer||'');
+      if(!nameLabel) nameLabel = orderNum.includes('-') ? orderNum.slice(0,orderNum.lastIndexOf('-')) : orderNum;
+      typeLabel   = orderNum.endsWith('-MC') ? '🚢 Container' : '🚛 Trailer';
+    }
+
+    // ── Status badge ──────────────────────────────────────────────
+    const statusBg  = isOpen ? 'background:var(--green);color:#fff;' : 'background:var(--gray-lt);color:var(--gray-dk);';
+    const statusBadge = `<span style="font-size:10px;font-weight:800;font-family:var(--font-cond);letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:20px;white-space:nowrap;${statusBg}">${isOpen?'In Progress':'Closed'}</span>`;
+
+    // ── Photo count ───────────────────────────────────────────────
+    const countKey  = shipId || orderNum;
+    const photoCount = photoCountMap[countKey] || 0;
+    const stageHtml  = photoCount > 0
+      ? `<div style="font-size:11px;color:var(--text-dim);margin:5px 0 2px;">📷 ${photoCount} photo${photoCount===1?'':'s'} taken</div>`
+      : `<div style="font-size:11px;color:var(--text-muted);margin:5px 0 2px;">No photos yet</div>`;
+
+    // ── Dates row ─────────────────────────────────────────────────
+    const startedStr = f.Started_DateTime ? `Started ${fmtShort(f.Started_DateTime)}` : '';
+    let closingHtml = '';
+    if(!isOpen){
+      const shippedMs  = new Date(f.Shipped_DateTime || f.Modified).getTime();
+      const daysLeft   = 3 - (Date.now() - shippedMs) / (24*60*60*1000);
+      const daysLeftRd = Math.max(0, Math.ceil(daysLeft));
+      const clr = daysLeft > 2 ? 'var(--green)' : daysLeft > 1 ? 'var(--amber)' : 'var(--red)';
+      const closedStr  = fmtShort(f.Shipped_DateTime || f.Modified);
+      closingHtml = `<div style="font-size:11px;margin-top:5px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="color:var(--text-dim);">Closed ${closedStr}</span>
+        <span style="color:${clr};font-weight:700;font-size:10px;">${daysLeftRd>0?`Falls off in ${daysLeftRd}d`:'Falling off soon'}</span>
+      </div>`;
+    }
+
+    return `<div class="rain-order-card" style="border-left:3px solid ${accentColor};" onclick="openRainOrder('${shipId}','${orderNum}')">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:2px;">
+        <div style="font-weight:700;font-size:14px;color:var(--text);line-height:1.2;">${orderNum}</div>
+        ${statusBadge}
+      </div>
+      ${nameLabel ? `<div style="font-size:11px;color:var(--text-dim);margin-bottom:3px;">${nameLabel}</div>` : ''}
+      <div style="font-size:11px;color:var(--text-dim);margin-bottom:6px;">${typeLabel}</div>
+      ${stageHtml}
+      <div style="font-size:11px;color:var(--text-muted);margin-top:5px;">${startedStr}${isOpen && f.Started_DateTime ? (() => { const d = Math.floor((Date.now() - new Date(f.Started_DateTime).getTime())/(864e5)); return d > 0 ? ` &nbsp;·&nbsp; <span style="color:${d>=3?'var(--red)':d>=2?'var(--amber)':'var(--text-muted)'};">Open ${d}d</span>` : ''; })() : ''}</div>
+      ${closingHtml}
+    </div>`;
+  }).join('');
+}
+
+async function openRainOrder(shipmentId, orderNum){
+  if(!shipmentId || !orderNum){ toast('Cannot open — missing data','err'); return; }
+  showOverlay('Loading order…');
+  try{
+    const token = await getToken();
+    await ensureSpIds(token);
+
+    // Fetch the shipment record
+    const filterExpr = `fields/Shipment_ID eq '${shipmentId.replace(/'/g,"''")}'`;
+    const url = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listShipments}/items`+
+      `?$expand=fields&$filter=${encodeURIComponent(filterExpr)}&$top=2`;
+    const res = await fetch(url, {
+      headers:{ Authorization:`Bearer ${token}`, Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly' }
+    });
+    if(!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+    const data = await res.json();
+    const item = (data.value||[])[0];
+    if(!item) throw new Error('Shipment not found');
+
+    const f = item.fields;
+    recentState.selectedOrder = {
+      shipmentId:   f.Shipment_ID,
+      shipmentSeq:  f.Shipment_Seq,
+      shipmentItemId: item.id,
+      orderNum:     f.GP_Order_Number,
+      status:       f.Status,
+      comment:      f.Order_Comment||'',
+      carrier:      f.Carrier||'',
+      trackingNum:  f.Tracking_Number||'',
+    };
+
+    hideOverlay();
+    // In-Progress RAIN orders go straight into capture — no confirmation needed.
+    // Only Shipped orders require the reopen reason flow via screen-detail.
+    if(f.Status === 'In Progress'){
+      await continueShipment();
+    } else {
+      const dwf = detectWorkflow(f.GP_Order_Number || orderNum);
+      const detailDisplayNum = dwf.display || f.GP_Order_Number || orderNum;
+      document.getElementById('detail-header-num').textContent  = f.Shipment_ID || detailDisplayNum;
+      document.getElementById('detail-order-num').textContent   = detailDisplayNum;
+      document.getElementById('detail-shipment-id').textContent = f.Shipment_ID || '—';
+      document.getElementById('detail-status').textContent      = f.Status || '—';
+      document.getElementById('detail-photo-count').textContent = '—';
+      document.getElementById('detail-packed-by').textContent   = f.Packer_Name || '—';
+      document.getElementById('detail-started').textContent     = f.Started_DateTime ? new Date(f.Started_DateTime).toLocaleString() : '—';
+      document.getElementById('detail-completed').textContent   = (f.Shipped_DateTime||f.Completed_DateTime) ? new Date(f.Shipped_DateTime||f.Completed_DateTime).toLocaleString() : '—';
+      document.getElementById('detail-comment').textContent     = f.Order_Comment || '—';
+      document.getElementById('detail-stages').innerHTML        = '<div class="empty-state"><div class="empty-icon">⏳</div>Loading photos…</div>';
+      document.getElementById('btn-continue-shipment').style.display = 'none';
+      document.getElementById('btn-reopen-shipment').style.display   = '';
+      showScreen('screen-detail');
+      await loadOrderPhotoDetail(f.GP_Order_Number || orderNum, f.Shipment_ID || shipmentId);
+    }
+  }catch(e){
+    hideOverlay();
+    console.error('openRainOrder error:', e);
+    toast('Could not open order: '+e.message,'err');
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Checks Brent's RAIN Machine Data sheet (column K = base ORDR number).
+// Returns true if the scanned order number matches any row → routes as RAIN order.
+// Uses a published CSV URL — no API key required.
+async function checkRainSheet(orderNum){
+  const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRyTgWYqxTowKZALIFQ4MAotGIu3N7llTWPTHdVncba-7-pRN7lAWRovFTzD4RXrXO19D9Vaw4ejfyM/pub?gid=0&single=true&output=csv';
+  try{
+    const res = await fetch(CSV_URL);
+    if(!res.ok) return false;
+    const text = await res.text();
+    // Exact match after stripping workflow suffixes — do NOT truncate, which
+    // caused B-companion orders (ORDR00052035B) to match the parent (ORDR00052035).
+    const target = orderNum.toUpperCase().trim()
+      .replace(/-MC$/, '').replace(/-MT$/, '').replace(/-L$/, '');
+    return text.split('\n').some(line => {
+      const cols = parseCSVRow(line);
+      return String(cols[10]||'').trim().toUpperCase() === target;
+    });
+  }catch(e){
+    console.warn('RAIN sheet check failed — defaulting to standard workflow:', e);
+    return false;
+  }
+}
+
+function emptyStages(stagesArr){
+  const arr = stagesArr || activeStages();
   const out = {};
-  for(const s of STAGES){
-    out[s.id] = { photos:[], savedCount:0, savedUrls:[] };
+  for(const s of arr){
+    out[s.id] = { photos:[], savedCount:0, savedUrls:[], savedMeta:[], na:false };
+    if(s.id === 'M_CLifts') out[s.id].lifts = [];
   }
   return out;
+}
+
+function emptyLift(num){ return {num, photos:[], savedCount:0, savedMeta:[], tags:[]}; }
+
+function syncLiftPhotos(st){
+  st.photos = (st.lifts||[]).flatMap(l => l.photos);
+}
+
+function tryParseJson(v){
+  if(!v) return {};
+  try{ return JSON.parse(v); }catch{ return {}; }
+}
+
+
+function collectNewPhotos(stages){
+  const out = [];
+  for(const stage of stages){
+    const st = S.stages[stage.id];
+    if(!st || st.na) continue;
+    if(stage.id === 'M_CLifts'){
+      for(const lift of (st.lifts||[])){
+        for(let i = lift.savedCount; i < lift.photos.length; i++){
+          out.push({stageId:`M_CLifts_${lift.num}`, dataUrl:lift.photos[i], sequence:i+1, _lift:lift});
+        }
+      }
+    } else {
+      for(let i = st.savedCount; i < st.photos.length; i++){
+        out.push({stageId:stage.id, dataUrl:st.photos[i], sequence:i+1});
+      }
+    }
+  }
+  return out;
+}
+
+// ── Lift form transient state ─────────────────────────────────────────────────
+let _liftFormOpen     = false;
+let _newLiftTags      = [];
+let _newLiftOtherOn   = false;
+let _newLiftOtherText = '';
+
+function openAddLiftForm(){
+  _liftFormOpen = true; _newLiftTags = []; _newLiftOtherOn = false; _newLiftOtherText = '';
+  renderCaptureScreen();
+  setTimeout(()=>{ const el=document.getElementById('new-lift-num'); if(el) el.focus(); }, 60);
+}
+
+function cancelAddLiftForm(){
+  _liftFormOpen = false;
+  renderCaptureScreen();
+}
+
+function addLiftFromInput(){
+  const numEl = document.getElementById('new-lift-num');
+  const num = numEl ? numEl.value.trim() : '';
+  if(!num){ toast('Enter a lift number','err'); return; }
+  const st = S.stages['M_CLifts'];
+  if(!st) return;
+  if(st.lifts.some(l => l.num === num)){ toast(`Lift #${num} already added`,'err'); return; }
+  const tags = [..._newLiftTags];
+  if(_newLiftOtherOn){
+    const inp = document.getElementById('new-lift-other-input');
+    const txt = (inp ? inp.value : _newLiftOtherText).trim();
+    if(txt) tags.push('Other: ' + txt);
+  }
+  st.lifts.push({num, tags, photos:[], savedCount:0});
+  syncLiftPhotos(st);
+  _liftFormOpen = false; _newLiftTags = []; _newLiftOtherOn = false; _newLiftOtherText = '';
+  renderCaptureScreen();
+}
+
+// Predefined tag toggle on new-lift form — DOM-only, no re-render
+function toggleNewLiftTag(tagIdx, el){
+  const tag = LIFT_TAGS[tagIdx];
+  const i = _newLiftTags.indexOf(tag);
+  if(i===-1){ _newLiftTags.push(tag); el.classList.add('active'); }
+  else { _newLiftTags.splice(i,1); el.classList.remove('active'); }
+}
+function toggleNewLiftOther(el){
+  _newLiftOtherOn = !_newLiftOtherOn;
+  el.classList.toggle('active', _newLiftOtherOn);
+  const wrap = document.getElementById('new-lift-other-wrap');
+  if(wrap){ wrap.style.display = _newLiftOtherOn ? 'block' : 'none'; if(_newLiftOtherOn){ const inp=wrap.querySelector('input'); if(inp) inp.focus(); } }
+}
+
+// Tag toggle on existing lift — DOM-only, no re-render
+function toggleLiftTag(liftIdx, tagIdx, el){
+  const tag = LIFT_TAGS[tagIdx];
+  const st = S.stages['M_CLifts'];
+  if(!st||!st.lifts[liftIdx]) return;
+  const lift = st.lifts[liftIdx];
+  if(!lift.tags) lift.tags=[];
+  const i = lift.tags.indexOf(tag);
+  if(i===-1){ lift.tags.push(tag); el.classList.add('active'); }
+  else { lift.tags.splice(i,1); el.classList.remove('active'); }
+}
+function toggleLiftOther(liftIdx, el){
+  const st = S.stages['M_CLifts'];
+  if(!st||!st.lifts[liftIdx]) return;
+  const lift = st.lifts[liftIdx];
+  if(!lift.tags) lift.tags=[];
+  const hasOther = lift.tags.some(t=>t.startsWith('Other: '));
+  const wrap = document.getElementById('lift-other-wrap-'+liftIdx);
+  if(hasOther){
+    lift.tags = lift.tags.filter(t=>!t.startsWith('Other: '));
+    el.classList.remove('active');
+    if(wrap) wrap.style.display='none';
+  } else {
+    el.classList.add('active');
+    if(wrap){ wrap.style.display='block'; const inp=wrap.querySelector('input'); if(inp) inp.focus(); }
+  }
+}
+function saveLiftOtherText(liftIdx){
+  const st = S.stages['M_CLifts'];
+  if(!st||!st.lifts[liftIdx]) return;
+  const lift = st.lifts[liftIdx];
+  if(!lift.tags) lift.tags=[];
+  const inp = document.getElementById('lift-other-input-'+liftIdx);
+  lift.tags = lift.tags.filter(t=>!t.startsWith('Other: '));
+  if(inp && inp.value.trim()) lift.tags.push('Other: '+inp.value.trim());
+}
+
+function removeLift(liftIdx){
+  const st = S.stages['M_CLifts'];
+  if(!st||!st.lifts[liftIdx]) return;
+  if(st.lifts[liftIdx].savedCount > 0){ toast('Cannot remove a lift that already has saved photos','err'); return; }
+  st.lifts.splice(liftIdx,1);
+  syncLiftPhotos(st);
+  renderCaptureScreen();
 }
 
 // ═══════════════════════════════════════════════════
@@ -1062,6 +1859,25 @@ function handleScan(val){
   submitOrderEntry();
 }
 
+function selectRainType(type){
+  S.rainShipType = type;
+  const btnT = document.getElementById('btn-rain-trailer');
+  const btnC = document.getElementById('btn-rain-container');
+  const green = 'var(--green)';
+  if(btnT){
+    btnT.style.background  = type==='Trailer' ? green : '';
+    btnT.style.color       = type==='Trailer' ? '#fff' : '';
+    btnT.style.borderColor = type==='Trailer' ? green  : '';
+  }
+  if(btnC){
+    btnC.style.background  = type==='Container' ? green : '';
+    btnC.style.color       = type==='Container' ? '#fff' : '';
+    btnC.style.borderColor = type==='Container' ? green  : '';
+  }
+  const hint = document.getElementById('rain-type-hint');
+  if(hint) hint.textContent = `✓ ${type} selected — tap "Confirm & Continue" to begin.`;
+}
+
 // ═══════════════════════════════════════════════════
 //  ORDER ENTRY → checks for duplicate shipments
 // ═══════════════════════════════════════════════════
@@ -1069,10 +1885,19 @@ async function submitOrderEntry(){
   const val = document.getElementById('order-input').value.trim().toUpperCase();
   if(!val){ toast('Please enter or scan an order number','err'); return; }
 
+  const wf = detectWorkflow(val);
   S.orderNum = val;
+  applyWorkflowState(wf);
 
   showOverlay('Checking order…');
   try{
+    // For standard orders, check Google Sheet for RAIN classification
+    if(wf.type==='standard'){
+      const isRain = await checkRainSheet(val);
+      S.isRainWorkflow = isRain;
+      S.rainShipType   = null;
+    }
+
     const token = await getToken();
     await ensureSpIds(token);
     const existing = await fetchExistingShipments(token, val);
@@ -1087,12 +1912,32 @@ async function submitOrderEntry(){
     S.shipmentSeq    = 1;
     S.shipmentId     = `${val}-S1`;
     S.shipmentItemId = null;
-    S.isReopen       = false;
-    S.reopenCode     = '';
-    S.reopenNote     = '';
-    S.stages         = emptyStages();
+    S.isReopen         = false;
+    S.reopenCode       = '';
+    S.reopenNote       = '';
+    S.orderComment     = '';
+    S.isShippingLabel  = false;
+    S.stages           = emptyStages();
 
-    document.getElementById('confirm-num').textContent = val;
+    document.getElementById('confirm-num').textContent = S.displayOrderNum;
+    document.getElementById('confirm-hero-sub').textContent =
+      S.isRainWorkflow ? 'RAIN Machine Order' :
+      wf.type==='L'    ? 'Work Order Number'  : 'GP Order Number';
+    document.getElementById('confirm-help-text').textContent =
+      S.isRainWorkflow
+        ? 'This is a RAIN Machine order. Select Trailer or Container below, then tap "Confirm & Continue" to begin.'
+        : wf.type==='L'
+          ? 'Confirm this order number matches your Google Sheet work order. All photos will be filed under this number.'
+          : 'Confirm this order number matches your picking ticket. All photos will be filed under this number.';
+    // Show/reset RAIN type selector
+    const rainCard = document.getElementById('rain-type-card');
+    if(rainCard) rainCard.style.display = S.isRainWorkflow ? '' : 'none';
+    const rainHint = document.getElementById('rain-type-hint');
+    if(rainHint) rainHint.textContent = 'Select a shipping method before tapping "Confirm & Continue"';
+    ['btn-rain-trailer','btn-rain-container'].forEach(id=>{
+      const b=document.getElementById(id);
+      if(b){b.style.background='';b.style.color='';b.style.borderColor='';}
+    });
     showScreen('screen-confirm');
   }catch(e){
     hideOverlay();
@@ -1103,7 +1948,13 @@ async function submitOrderEntry(){
 
 // Returns array of shipment summary objects sorted by seq desc.
 async function fetchExistingShipments(token, orderNum){
-  const filterExpr = `fields/GP_Order_Number eq '${orderNum.replace(/'/g,"''")}'`;
+  const esc = s => s.replace(/'/g,"''");
+  // Also search RAIN suffix variants so a re-scan of a plain order number finds prior RAIN shipments
+  const _wf = detectWorkflow(orderNum);
+  const searchNums = _wf.type==='standard'
+    ? [orderNum, orderNum+'-MC', orderNum+'-MT']
+    : [orderNum];
+  const filterExpr = searchNums.map(n=>`fields/GP_Order_Number eq '${esc(n)}'`).join(' or ');
   const url = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listShipments}/items`+
     `?$expand=fields&$filter=${encodeURIComponent(filterExpr)}&$top=50`;
 
@@ -1143,6 +1994,7 @@ async function fetchExistingShipments(token, orderNum){
       completed:      f.Completed_DateTime || null,
       created:        f.Created || item.createdDateTime,
       photoCount:     0,
+      comment:        f.Order_Comment || '',
     };
   });
 
@@ -1186,6 +2038,17 @@ async function fetchExistingShipments(token, orderNum){
 //  CAPTURE SCREEN
 // ═══════════════════════════════════════════════════
 async function startCapture(){
+  if(S.isRainWorkflow && !S.rainShipType){
+    toast('Please select Trailer or Container first','err'); return;
+  }
+  // Encode RAIN ship type in the stored order number (-MC or -MT)
+  if(S.isRainWorkflow && S.rainShipType){
+    const suffix = S.rainShipType==='Container' ? '-MC' : '-MT';
+    if(!S.orderNum.endsWith(suffix)){
+      S.orderNum   = S.orderNum + suffix;
+      S.shipmentId = `${S.orderNum}-S${S.shipmentSeq}`;
+    }
+  }
   // Create the Shipments row up front so photos can attach to a real
   // shipment record. If creation fails, abort and surface the error.
   showOverlay('Starting shipment…');
@@ -1207,6 +2070,11 @@ async function startCapture(){
       Packer_Name:       userName,
       Is_Deleted:        false,
     };
+    // Tag companion orders (A, B, etc.) so the RAIN dashboard can surface them
+    const companionMatch = S.orderNum.match(/([A-Z])$/i);
+    if(companionMatch && !S.orderNum.endsWith('-MC') && !S.orderNum.endsWith('-MT') && !S.orderNum.endsWith('-L')){
+      fields.Order_Suffix = companionMatch[1].toUpperCase();
+    }
 
     const created = await spCreateListItem(token, CFG.listShipments, fields);
     S.shipmentItemId = created.id;
@@ -1220,10 +2088,13 @@ async function startCapture(){
 
   // Reset stages for a fresh shipment (reopen path bypasses startCapture)
   S.stages = emptyStages();
+  S.orderComment = '';
+  const commentEl = document.getElementById('order-comment');
+  if(commentEl){ commentEl.value = ''; updateCommentCounter(); }
 
   // Configure capture screen
-  document.getElementById('capture-order-label').textContent = S.orderNum;
-  document.getElementById('progress-order-num').textContent  = S.orderNum;
+  document.getElementById('capture-order-label').textContent = S.displayOrderNum || S.orderNum;
+  document.getElementById('progress-order-num').textContent  = S.displayOrderNum || S.orderNum;
   document.getElementById('progress-tagline').textContent    =
     `${S.shipmentId} · capture each stage in any order`;
   document.getElementById('capture-reopen-badge').style.display = 'none';
@@ -1233,49 +2104,212 @@ async function startCapture(){
 }
 
 function renderCaptureScreen(){
-  // Progress pips
-  const pipsEl = document.getElementById('progress-pips');
-  pipsEl.innerHTML = STAGES.map((stage,i) => {
-    const has = (S.stages[stage.id]?.photos?.length || 0) > 0;
-    return `<div class="progress-pip${has?' done':''}" title="${stage.label}">${has?'':(i+1)}</div>`;
-  }).join('');
-
-  // Stage cards
+  const pipsEl  = document.getElementById('progress-pips');
   const cardsEl = document.getElementById('stage-cards');
-  cardsEl.innerHTML = STAGES.map(stage => {
-    const st = S.stages[stage.id] || {photos:[], savedCount:0};
+
+  const notesCard = document.getElementById('order-notes-card');
+
+  // ── SHIPPING LABEL MODE: one card, one pip ──────────────
+  if(S.isShippingLabel){
+    if(notesCard) notesCard.style.display = 'none';
+    const st    = S.stages['ShippingLabel'] || {photos:[], savedCount:0};
     const count = st.photos.length;
     const hasClass = count > 0 ? ' has-photos' : '';
-    const grid = count === 0 ? '' : `
-      <div class="photo-grid">
-        ${st.photos.map((src,i)=>{
-          const isSaved = i < st.savedCount;
-          const rmBtn = isSaved
-            ? `<button class="thumb-rm" disabled title="Already saved">✓</button>`
-            : `<button class="thumb-rm" onclick="removeStagePhoto('${stage.id}',${i})">✕</button>`;
-          return `<div class="photo-thumb">
-            <img src="${src}" loading="lazy"/>
-            ${rmBtn}
-            <div class="thumb-label">${stage.label.split(' ')[0]} ${i+1}${isSaved?' ✓':''}</div>
-          </div>`;
-        }).join('')}
-      </div>`;
-    return `<div class="stage-card${hasClass}" id="stage-card-${stage.id}">
+    const grid = count === 0 ? '' : `<div class="photo-grid">
+      ${st.photos.map((src,i) => {
+        const isSaved = i < st.savedCount;
+        const rmBtn = isSaved
+          ? `<button class="thumb-rm" disabled title="Already saved">✓</button>`
+          : `<button class="thumb-rm" onclick="removeStagePhoto('ShippingLabel',${i})">✕</button>`;
+        return `<div class="photo-thumb">
+          <img src="${resolvePhotoSrc(src)}" loading="lazy"/>
+          ${rmBtn}
+          <div class="thumb-label">Label ${i+1}${isSaved?' ✓':''}</div>
+        </div>`;
+      }).join('')}
+    </div>`;
+    pipsEl.innerHTML  = `<div class="progress-pip${count>0?' done':''}" title="Shipping Label">🏷</div>`;
+    cardsEl.innerHTML = `<div class="stage-card${hasClass}" id="stage-card-ShippingLabel">
       <div class="stage-card-header">
         <div>
-          <span class="stage-card-num">${STAGES.indexOf(stage)+1}.</span>
-          <span class="stage-card-title">${stage.icon} &nbsp;${stage.label}</span>
+          <span class="stage-card-num">1.</span>
+          <span class="stage-card-title">${LABEL_STAGE.icon} &nbsp;${LABEL_STAGE.label}</span>
         </div>
         <div class="stage-card-status">
           <span class="stage-card-count">${count} photo${count!==1?'s':''}</span>
         </div>
       </div>
       <div class="stage-card-body">
-        <div class="stage-help">${stage.help}</div>
+        <div class="stage-help">${LABEL_STAGE.help}</div>
         ${grid}
-        <button class="btn btn-outline btn-sm" onclick="openPhotoCamera('${stage.id}')" style="width:100%;">
-          📷 &nbsp;Add ${stage.label.split(' ')[0]} Photo
-        </button>
+        <div style="display:flex;gap:7px;">
+          <button class="btn btn-outline btn-sm" onclick="openPhotoCamera('ShippingLabel')" style="flex:1;">📷&nbsp;Camera</button>
+          <button class="btn btn-outline btn-sm" onclick="openPhotoUpload('ShippingLabel')" style="flex:1;">📁&nbsp;Upload</button>
+        </div>
+      </div>
+    </div>`;
+    updateSubmitBtn();
+    return;
+  }
+
+  // ── NORMAL / L-WORKFLOW STAGE MODE ────────────────────────────────
+  if(notesCard) notesCard.style.display = '';
+
+  const stages = activeStages();
+
+  // Progress pips — done if has photos OR marked N/A
+  pipsEl.innerHTML = stages.map((stage,i) => {
+    const st  = S.stages[stage.id];
+    const done = (st?.photos?.length || 0) > 0 || st?.na === true;
+    return `<div class="progress-pip${done?' done':''}" title="${stage.label}">${done?'':(i+1)}</div>`;
+  }).join('');
+
+  // Stage cards
+  cardsEl.innerHTML = stages.map((stage, idx) => {
+    const st      = S.stages[stage.id] || {photos:[], savedCount:0, na:false};
+    const count   = st.photos.length;
+    const isNA    = st.na === true;
+    const hasClass= count > 0 ? ' has-photos' : (isNA ? ' is-na' : '');
+
+    // ── Special rendering for Lift Photos ────────────────────────────────────
+    if(stage.id === 'M_CLifts' && !isNA){
+      const lifts   = st.lifts || [];
+      const totalPh = lifts.reduce((s,l)=>s+l.photos.length,0);
+      const inpStyle= `width:100%;padding:8px;border:1.5px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font-size:14px;box-sizing:border-box;`;
+
+      const liftCards = lifts.map((lift, li) => {
+        const tags = lift.tags || [];
+        const otherTag = tags.find(t=>t.startsWith('Other: '));
+        const otherText = otherTag ? otherTag.slice(7) : '';
+
+        const liftGrid = lift.photos.length === 0 ? '' : `
+          <div class="photo-grid" style="margin-bottom:8px;">
+            ${lift.photos.map((src,pi)=>{
+              const isSaved = pi < lift.savedCount;
+              const rmBtn = isSaved
+                ? `<button class="thumb-rm thumb-rm-saved" onclick="removeStagePhoto('M_CLifts:${li}',${pi})" title="Delete from SharePoint">✕</button>`
+                : `<button class="thumb-rm thumb-rm-pending" title="Saving…">⏳</button>`;
+              return `<div class="photo-thumb"><img src="${resolvePhotoSrc(src)}" loading="lazy"/>${rmBtn}<div class="thumb-label">Lift #${lift.num} (${pi+1})${isSaved?' ✓':''}</div></div>`;
+            }).join('')}
+          </div>`;
+
+        const tagChips = LIFT_TAGS.map((t,ti)=>
+          `<span class="lift-tag-chip${tags.includes(t)?' active':''}" onclick="toggleLiftTag(${li},${ti},this)">${t}</span>`
+        ).join('');
+        const otherChip = `<span class="lift-tag-chip${otherTag?' active':''}" id="lift-other-chip-${li}" onclick="toggleLiftOther(${li},this)">Other (Freeform)</span>`;
+        const otherWrap = `<div id="lift-other-wrap-${li}" style="display:${otherTag?'block':'none'};margin-top:6px;">
+          <input type="text" id="lift-other-input-${li}" placeholder="Describe this lift…" value="${otherText.replace(/"/g,'&quot;')}" style="${inpStyle}" oninput="saveLiftOtherText(${li})"/>
+        </div>`;
+        const tagSummary = tags.length ? `<div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:3px;">${tags.map(t=>`<span style="font-size:10px;padding:2px 7px;border-radius:12px;background:var(--green);color:#fff;">${t.startsWith('Other: ')?t.slice(7):t}</span>`).join('')}</div>` : '';
+        const canRemove = lift.savedCount === 0 && lift.photos.length === 0;
+
+        return `<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+            <div><div style="font-weight:600;font-size:14px;">Lift #${lift.num}</div>${tagSummary}</div>
+            ${canRemove
+              ? `<button class="btn-na" onclick="removeLift(${li})" style="font-size:11px;padding:3px 8px;margin-top:0;width:auto;">✕ Remove</button>`
+              : `<span style="font-size:12px;color:var(--text-muted);white-space:nowrap;">${lift.photos.length} photo${lift.photos.length!==1?'s':''}</span>`}
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Tags (optional)</div>
+          <div>${tagChips}${otherChip}</div>
+          ${otherWrap}
+          ${liftGrid}
+          <div style="display:flex;gap:7px;margin-top:8px;">
+            <button class="btn btn-outline btn-sm" onclick="openPhotoCamera('M_CLifts:${li}')" style="flex:1;">📷&nbsp;Camera</button>
+            <button class="btn btn-outline btn-sm" onclick="openPhotoUpload('M_CLifts:${li}')" style="flex:1;">📁&nbsp;Upload</button>
+          </div>
+        </div>`;
+      }).join('');
+
+      const addSection = _liftFormOpen
+        ? `<div style="border:1.5px solid var(--green);border-radius:8px;padding:12px;margin-top:${lifts.length?'4px':'0'};">
+            <div style="font-weight:600;font-size:13px;color:var(--green);margin-bottom:10px;">New Lift</div>
+            <div style="margin-bottom:10px;">
+              <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Lift Number *</div>
+              <input type="number" id="new-lift-num" placeholder="e.g. 1" min="1" max="99" style="${inpStyle}" onkeydown="if(event.key==='Enter')addLiftFromInput()"/>
+            </div>
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Tags (optional — select all that apply)</div>
+            <div style="margin-bottom:6px;">
+              ${LIFT_TAGS.map((t,ti)=>`<span class="lift-tag-chip${_newLiftTags.includes(t)?' active':''}" onclick="toggleNewLiftTag(${ti},this)">${t}</span>`).join('')}
+              <span class="lift-tag-chip${_newLiftOtherOn?' active':''}" onclick="toggleNewLiftOther(this)">Other (Freeform)</span>
+            </div>
+            <div id="new-lift-other-wrap" style="display:${_newLiftOtherOn?'block':'none'};margin-bottom:8px;">
+              <input type="text" id="new-lift-other-input" placeholder="Describe this lift…" value="${_newLiftOtherText.replace(/"/g,'&quot;')}" style="${inpStyle}"/>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:8px;">
+              <button class="btn btn-outline btn-sm" onclick="cancelAddLiftForm()" style="flex:1;">Cancel</button>
+              <button class="btn btn-primary btn-sm" onclick="addLiftFromInput()" style="flex:1;">Add Lift →</button>
+            </div>
+          </div>`
+        : `<button class="btn btn-outline btn-sm" onclick="openAddLiftForm()" style="width:100%;margin-top:${lifts.length?'4px':'0'};">+ Add Lift</button>`;
+
+      const naBtn = `<button class="btn-na" onclick="toggleStageNA('M_CLifts')" style="margin-top:10px;">Mark as N/A</button>`;
+
+      return `<div class="stage-card${hasClass}" id="stage-card-${stage.id}">
+        <div class="stage-card-header">
+          <div>
+            <span class="stage-card-num">${idx+1}.</span>
+            <span class="stage-card-title">${stage.icon} &nbsp;${stage.label}</span>
+          </div>
+          <div class="stage-card-status">
+            <span class="stage-card-count">${lifts.length} lift${lifts.length!==1?'s':''}, ${totalPh} photo${totalPh!==1?'s':''}</span>
+          </div>
+        </div>
+        <div class="stage-card-body">
+          <div class="stage-help">${stage.help}</div>
+          ${liftCards}${addSection}${naBtn}
+        </div>
+      </div>`;
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
+    const grid = count === 0 ? '' : `
+      <div class="photo-grid">
+        ${st.photos.map((src,i)=>{
+          const isSaved = i < st.savedCount;
+          const rmBtn = isSaved
+            ? `<button class="thumb-rm thumb-rm-saved" onclick="removeStagePhoto('${stage.id}',${i})" title="Delete from SharePoint">✕</button>`
+            : `<button class="thumb-rm thumb-rm-pending" title="Saving…">⏳</button>`;
+          return `<div class="photo-thumb">
+            <img src="${resolvePhotoSrc(src)}" loading="lazy"/>
+            ${rmBtn}
+            <div class="thumb-label">${stage.label.split(' ')[0]} ${i+1}${isSaved?' ✓':''}</div>
+          </div>`;
+        }).join('')}
+      </div>`;
+
+    const naBtn = stage.canSkip
+      ? `<button class="btn-na${isNA?' active':''}" onclick="toggleStageNA('${stage.id}')">
+           ${isNA ? '↩ Undo N/A' : 'Mark as N/A'}
+         </button>`
+      : '';
+
+    const photoBtn = isNA
+      ? ''
+      : `<div style="display:flex;gap:7px;margin-top:${count>0?'6px':'0'};">
+           <button class="btn btn-outline btn-sm" onclick="openPhotoCamera('${stage.id}')" style="flex:1;">📷&nbsp;Camera</button>
+           <button class="btn btn-outline btn-sm" onclick="openPhotoUpload('${stage.id}')" style="flex:1;">📁&nbsp;Upload</button>
+         </div>`;
+
+    const naLabel = isNA
+      ? `<div style="font-size:12px;color:var(--text-muted);font-style:italic;padding:4px 0 6px;">
+           Marked as N/A — no photo required for this stage.
+         </div>`
+      : '';
+
+    return `<div class="stage-card${hasClass}" id="stage-card-${stage.id}">
+      <div class="stage-card-header">
+        <div>
+          <span class="stage-card-num">${idx+1}.</span>
+          <span class="stage-card-title">${stage.icon} &nbsp;${stage.label}</span>
+        </div>
+        <div class="stage-card-status">
+          <span class="stage-card-count">${isNA ? 'N/A' : count+' photo'+(count!==1?'s':'')}</span>
+        </div>
+      </div>
+      <div class="stage-card-body">
+        <div class="stage-help">${stage.help}</div>
+        ${naLabel}${grid}${photoBtn}${naBtn}
       </div>
     </div>`;
   }).join('<div style="height:8px;"></div>');
@@ -1283,12 +2317,27 @@ function renderCaptureScreen(){
   updateSubmitBtn();
 }
 
+function toggleStageNA(stageId){
+  const st = S.stages[stageId];
+  if(!st) return;
+  if(st.photos.length > 0){
+    toast('Remove photos before marking this stage N/A', 'err');
+    return;
+  }
+  st.na = !st.na;
+  renderCaptureScreen();
+}
+
 function updateSubmitBtn(){
   // Submit/Save button enables when all 5 stages have at least 1 photo
   // (saved or unsaved) for a fresh shipment, OR — for a reopen — when
   // any new photos exist.
-  const allStagesPresent = STAGES.every(s => (S.stages[s.id]?.photos?.length || 0) > 0);
-  const hasNew = STAGES.some(s => {
+  const stages = activeStages();
+  const allStagesPresent = stages.every(s => {
+    const st = S.stages[s.id];
+    return (st?.photos?.length || 0) > 0 || st?.na === true;
+  });
+  const hasNew = stages.some(s => {
     const st = S.stages[s.id]; return st && st.photos.length > st.savedCount;
   });
 
@@ -1296,42 +2345,289 @@ function updateSubmitBtn(){
   const lbl = document.getElementById('btn-submit-label');
   const help = document.getElementById('submit-help');
 
-  if(S.isReopen){
-    // Reopen: enable when there is at least one new photo to upload
-    btn.disabled = !hasNew;
-    btn.style.opacity = hasNew ? '1' : '0.5';
-    lbl.textContent = hasNew ? 'Upload New Photos & Close' : 'No New Photos Yet';
-    help.textContent = 'Add at least one photo to enable upload.';
+  const saveLaterBtn = document.getElementById('btn-save-later');
+
+  if(S.isShippingLabel){
+    const labelSt  = S.stages['ShippingLabel'] || {photos:[], savedCount:0};
+    const hasLabel = labelSt.photos.length > 0;
+    const hasNewLabel = labelSt.photos.length > labelSt.savedCount;
+    btn.disabled = !hasLabel;
+    btn.style.opacity = hasLabel ? '1' : '0.5';
+    lbl.textContent = hasNewLabel ? 'Upload Label & Mark Shipped' : 'Mark as Shipped';
+    help.textContent = !hasLabel
+      ? 'Take at least 1 label photo before marking as Shipped.'
+      : hasNewLabel
+        ? 'Label photo will be uploaded and order marked Shipped.'
+        : 'Label already on file — mark as Shipped.';
+    if(saveLaterBtn) saveLaterBtn.style.display = 'none';
+  } else if(S.isReopen){
+    // Reopen: always enabled — photos are optional, just close to mark Complete
+    btn.disabled = false;
+    btn.style.opacity = '1';
+    lbl.textContent = hasNew ? 'Upload Photos & Close' : 'Close Order';
+    help.textContent = hasNew
+      ? 'New photos will be uploaded and order marked Complete.'
+      : 'Add photos if needed, or close now to mark as Complete.';
+    if(saveLaterBtn) saveLaterBtn.style.display = 'none';
   } else {
-    // New shipment: require all 5 stages
+    // New/continued shipment: require all stages (photo or N/A)
     btn.disabled = !allStagesPresent;
     btn.style.opacity = allStagesPresent ? '1' : '0.5';
     lbl.textContent = 'Complete Shipment';
-    const missing = STAGES.filter(s => (S.stages[s.id]?.photos?.length || 0) === 0).length;
+    const missing = stages.filter(s => {
+      const st = S.stages[s.id];
+      return (st?.photos?.length || 0) === 0 && st?.na !== true;
+    }).length;
     if(missing === 0){
       help.textContent = 'All stages captured — ready to submit.';
     } else {
-      help.textContent = `${missing} stage${missing!==1?'s':''} still need at least 1 photo.`;
+      help.textContent = `${missing} stage${missing!==1?'s':''} still need at least 1 photo (or mark N/A).`;
     }
+    // Show "Save for Later" only once the Shipments row exists in SharePoint
+    if(saveLaterBtn) saveLaterBtn.style.display = S.shipmentItemId ? '' : 'none';
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  AUTO-SAVE A SINGLE PHOTO IMMEDIATELY AFTER CAPTURE
+// ═══════════════════════════════════════════════════
+async function autoSavePhoto(stageId, photoIdx, liftRef){
+  // stageId: stage key (e.g. 'M_CFinalPacked') or 'M_CLifts' when liftRef is set
+  // photoIdx: index within st.photos (or lift.photos) of the new photo
+  // liftRef: the lift object if this is a lift photo, else null
+  try{
+    const token = await getToken();
+    await ensureSpIds(token);
+    const userName  = S.user?.name || S.user?.username || '';
+    const userEmail = S.user?.username || S.user?.name || '';
+    const now = new Date().toISOString();
+
+    const src = liftRef ? liftRef.photos[photoIdx] : S.stages[stageId].photos[photoIdx];
+    if(!src || src.startsWith('http')) return; // already a SP URL, skip
+
+    const sequence   = photoIdx + 1;
+    const spStageId  = liftRef ? `M_CLifts_${liftRef.num}` : stageId;
+    const folderPath = `${S.orderNum}/${S.shipmentId}/${spStageId}`;
+    const fileName   = `${S.shipmentId}_${spStageId}_${sequence}_${Date.now()}.jpg`;
+
+    const blob  = dataUrlToBlob(src);
+    const spUrl = await spUploadFile(token, folderPath, fileName, blob);
+
+    const fields = {
+      Title:                  fileName,
+      GP_Order_Number:        S.orderNum,
+      Shipment_ID:            S.shipmentId,
+      Stage:                  spStageId,
+      Photo_Sequence:         sequence,
+      SharePoint_URL:         spUrl,
+      File_Name:              fileName,
+      Captured_By:            userName,
+      Captured_Email:         userEmail,
+      Captured_DateTime:      now,
+      Added_After_Completion: !!S.isReopen,
+      Reason_Code:            S.isReopen ? (S.reopenCode||'') : '',
+      Reason_Note:            S.isReopen ? (S.reopenNote||'') : '',
+      Is_Deleted:             false,
+    };
+    if(liftRef && (liftRef.tags||[]).length) fields.Lift_Tags = JSON.stringify(liftRef.tags);
+
+    const created = await spCreateListItem(token, CFG.listPhotos, fields);
+    const meta = { url: spUrl, itemId: created.id, fileName };
+
+    // Cache the original dataUrl under the SP URL key so resolvePhotoSrc()
+    // can display it immediately — the browser can't load SP URLs without auth.
+    // validateSavedPhotos() will later swap in a proper blob URL.
+    S.savedThumbCache[spUrl] = src;
+
+    if(liftRef){
+      liftRef.photos[photoIdx] = spUrl;
+      liftRef.savedCount++;
+      liftRef.savedMeta = liftRef.savedMeta || [];
+      liftRef.savedMeta.push(meta);
+      syncLiftPhotos(S.stages['M_CLifts']);
+    } else {
+      const st = S.stages[stageId];
+      st.photos[photoIdx] = spUrl;
+      st.savedCount++;
+      st.savedUrls.push(spUrl);
+      st.savedMeta = st.savedMeta || [];
+      st.savedMeta.push(meta);
+    }
+    renderCaptureScreen();
+  }catch(e){
+    console.error('autoSavePhoto failed:', e);
+    toast('Photo save failed — it will be retried when you finish the order', 'err');
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  DELETE A SAVED PHOTO (SP file + list item)
+// ═══════════════════════════════════════════════════
+let _delPending = null; // {stageId, photoIdx, liftIdx}
+
+function promptDeletePhoto(stageId, photoIdx, liftIdx){
+  _delPending = {stageId, photoIdx, liftIdx: liftIdx ?? null};
+  document.getElementById('del-photo-modal-bg').style.display = 'flex';
+}
+function cancelDeletePhoto(){
+  _delPending = null;
+  document.getElementById('del-photo-modal-bg').style.display = 'none';
+}
+async function confirmDeletePhoto(){
+  document.getElementById('del-photo-modal-bg').style.display = 'none';
+  if(!_delPending) return;
+  const {stageId, photoIdx, liftIdx} = _delPending;
+  _delPending = null;
+
+  showOverlay('Deleting photo…');
+  try{
+    const token = await getToken();
+    await ensureSpIds(token);
+
+    const liftRef  = (liftIdx !== null) ? S.stages['M_CLifts']?.lifts[liftIdx] : null;
+    const metaArr  = liftRef ? (liftRef.savedMeta||[]) : (S.stages[stageId]?.savedMeta||[]);
+    // savedMeta indices correspond to saved photo slots (0..savedCount-1)
+    const meta     = metaArr[photoIdx];
+
+    if(meta?.itemId){
+      // Soft-delete the list item
+      try{ await spPatchListItem(token, CFG.listPhotos, meta.itemId, { Is_Deleted: true }); }
+      catch(e){ console.warn('List item soft-delete failed:', e.message); }
+
+      // Hard-delete the file from the drive
+      try{
+        const marker = '/' + CFG.photoLibrary + '/';
+        const pos = (meta.url||'').indexOf(marker);
+        if(pos >= 0){
+          const rel = decodeURIComponent(meta.url.substring(pos + marker.length));
+          const enc = rel.split('/').map(encodeURIComponent).join('/');
+          await fetch(
+            `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/drives/${S.spDriveId}/root:/${enc}`,
+            { method:'DELETE', headers:{ Authorization:`Bearer ${token}` } }
+          );
+        }
+      }catch(e){ console.warn('File delete failed:', e.message); }
+    }
+
+    // Remove from local state
+    if(liftRef){
+      liftRef.photos.splice(photoIdx, 1);
+      liftRef.savedCount = Math.max(0, liftRef.savedCount - 1);
+      if(liftRef.savedMeta) liftRef.savedMeta.splice(photoIdx, 1);
+      syncLiftPhotos(S.stages['M_CLifts']);
+    } else {
+      const st = S.stages[stageId];
+      st.photos.splice(photoIdx, 1);
+      st.savedCount = Math.max(0, st.savedCount - 1);
+      if(st.savedUrls)  st.savedUrls.splice(photoIdx, 1);
+      if(st.savedMeta)  st.savedMeta.splice(photoIdx, 1);
+    }
+
+    hideOverlay();
+    renderCaptureScreen();
+    toast('Photo deleted', 'ok');
+  }catch(e){
+    hideOverlay();
+    console.error('confirmDeletePhoto error:', e);
+    toast('Delete failed: ' + e.message, 'err');
   }
 }
 
 // ═══════════════════════════════════════════════════
 //  PHOTO CAMERA (per-stage)
 // ═══════════════════════════════════════════════════
+let uploadTargetStage = null;
+
+function openPhotoUpload(stageId){
+  uploadTargetStage = stageId;
+  const input = document.getElementById('photo-upload-input');
+  input.value = '';
+  input.click();
+}
+
+async function handlePhotoUpload(evt){
+  const stageId = uploadTargetStage;
+  if(!stageId) return;
+  const files = Array.from(evt.target.files);
+  if(!files.length) return;
+
+  if(stageId.startsWith('M_CLifts:')){
+    const li = parseInt(stageId.split(':')[1]);
+    const st = S.stages['M_CLifts'];
+    if(!st || !st.lifts[li]) return;
+    const lift = st.lifts[li];
+    for(const file of files){
+      const dataUrl = await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=e=>res(e.target.result); r.onerror=rej; r.readAsDataURL(file); });
+      const idx = lift.photos.length;
+      lift.photos.push(dataUrl);
+      autoSavePhoto('M_CLifts', idx, lift);
+    }
+    syncLiftPhotos(st);
+  } else {
+    if(!S.stages[stageId]) return;
+    for(const file of files){
+      const dataUrl = await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=e=>res(e.target.result); r.onerror=rej; r.readAsDataURL(file); });
+      const idx = S.stages[stageId].photos.length;
+      S.stages[stageId].photos.push(dataUrl);
+      autoSavePhoto(stageId, idx, null);
+    }
+  }
+  renderCaptureScreen();
+  toast(`${files.length} photo${files.length!==1?'s':''} added — saving…`,'ok');
+}
+
+function currentTargetPhotoCount(){
+  const stageId = S.photoTargetStage;
+  if(!stageId) return 0;
+  if(stageId.startsWith('M_CLifts:')){
+    const li = parseInt(stageId.split(':')[1]);
+    const st = S.stages['M_CLifts'];
+    return (st && st.lifts[li]) ? st.lifts[li].photos.length : 0;
+  }
+  return S.stages[stageId] ? S.stages[stageId].photos.length : 0;
+}
+
+function updateCamShotCount(){
+  const el = document.getElementById('cam-shot-count');
+  if(!el) return;
+  const n = currentTargetPhotoCount();
+  el.textContent = n ? `${n} photo${n!==1?'s':''} so far` : 'No photos yet';
+}
+
+function flashCamera(){
+  const el = document.getElementById('cam-fs-flash');
+  if(!el) return;
+  el.classList.remove('flash');
+  void el.offsetWidth; // restart animation
+  el.classList.add('flash');
+}
+
 async function openPhotoCamera(stageId){
   S.photoTargetStage = stageId;
-  const stage = STAGES.find(s => s.id === stageId);
-  document.getElementById('cam-stage-label').textContent = stage ? stage.label : 'Photo';
+  const baseId = stageId.includes(':') ? stageId.split(':')[0] : stageId;
+  const stage = allKnownStages().find(s => s.id === baseId) || null;
+  let camLabel = stage ? stage.label : 'Photo';
+  if(stageId.includes(':')){
+    const li = parseInt(stageId.split(':')[1]);
+    const st = S.stages['M_CLifts'];
+    if(st && st.lifts[li]) camLabel = `Lift #${st.lifts[li].num}`;
+  }
+  document.getElementById('cam-stage-label').textContent = camLabel;
+  updateCamShotCount();
   const camWrap = document.getElementById('photo-cam-wrap');
-  camWrap.style.display='block';
+  camWrap.style.display='flex';
   const video=document.getElementById('photo-video');
+  // Reuse an already-open stream (e.g. user switched target without closing
+  // the camera) instead of requesting a new one every time.
+  if(S.photoStream && S.photoStream.active){
+    video.srcObject = S.photoStream;
+    return;
+  }
   try{
     S.photoStream = await navigator.mediaDevices.getUserMedia({
       video:{facingMode:'environment',width:{ideal:1920},height:{ideal:1080}}
     });
     video.srcObject = S.photoStream;
-    camWrap.scrollIntoView({behavior:'smooth',block:'start'});
   }catch(e){
     toast('Camera unavailable','err');
     camWrap.style.display='none';
@@ -1349,28 +2645,48 @@ function capturePhoto(){
   canvas.width=video.videoWidth; canvas.height=video.videoHeight;
   canvas.getContext('2d').drawImage(video,0,0);
   const dataUrl=canvas.toDataURL('image/jpeg',0.88);
-  stopPhotoCamera();
 
   const stageId = S.photoTargetStage;
-  if(!stageId || !S.stages[stageId]){
-    toast('Stage not found','err'); return;
+  if(stageId && stageId.startsWith('M_CLifts:')){
+    const li = parseInt(stageId.split(':')[1]);
+    const st = S.stages['M_CLifts'];
+    if(!st || !st.lifts[li]){ toast('Lift not found','err'); return; }
+    const lift = st.lifts[li];
+    const idx  = lift.photos.length;
+    lift.photos.push(dataUrl);
+    syncLiftPhotos(st);
+    autoSavePhoto('M_CLifts', idx, lift);
+  } else {
+    if(!stageId || !S.stages[stageId]){ toast('Stage not found','err'); return; }
+    const idx = S.stages[stageId].photos.length;
+    S.stages[stageId].photos.push(dataUrl);
+    autoSavePhoto(stageId, idx, null);
   }
-  S.stages[stageId].photos.push(dataUrl);
-
+  // Keep the camera open for rapid multi-shot capture (e.g. several Lift
+  // photos in a row) — tearing the stream down and requesting it again on
+  // every single shot is what was triggering a fresh permission prompt
+  // each time, and forcing a scroll-to-top on reopen.
   renderCaptureScreen();
-  toast('Photo captured','ok');
+  updateCamShotCount();
+  flashCamera();
 }
 
 function removeStagePhoto(stageId, idx){
-  const st = S.stages[stageId];
-  if(!st) return;
-  if(idx < st.savedCount){
-    toast('Saved photos cannot be removed from the app','err');
+  if(stageId && stageId.startsWith('M_CLifts:')){
+    const li = parseInt(stageId.split(':')[1]);
+    const st = S.stages['M_CLifts'];
+    if(!st || !st.lifts[li]) return;
+    const lift = st.lifts[li];
+    if(idx < lift.savedCount){ promptDeletePhoto('M_CLifts', idx, li); return; }
+    lift.photos.splice(idx, 1);
+    syncLiftPhotos(st);
+    renderCaptureScreen();
     return;
   }
+  const st = S.stages[stageId];
+  if(!st) return;
+  if(idx < st.savedCount){ promptDeletePhoto(stageId, idx, null); return; }
   st.photos.splice(idx,1);
-  // savedUrls follows photos — only the unsaved tail is removed; nothing
-  // to delete in savedUrls because saved photos are at the front.
   renderCaptureScreen();
 }
 
@@ -1380,7 +2696,12 @@ function removeStagePhoto(stageId, idx){
 function captureBack(){
   // For a brand-new shipment in progress, going back means abandoning
   // the in-flight Shipments row + any uploaded photos. Warn the user.
-  const hasAnyWork = STAGES.some(s => (S.stages[s.id]?.photos?.length || 0) > 0);
+  const hasAnyWork = activeStages().some(s => (S.stages[s.id]?.photos?.length || 0) > 0);
+  if(S.isShippingLabel){
+    resetState();
+    showScreen('screen-scan');
+    return;
+  }
   if(S.isReopen){
     showScreen('screen-detail');
     return;
@@ -1391,13 +2712,11 @@ function captureBack(){
     return;
   }
   showDialog(
-    'Discard this shipment?',
-    'You have captured photos but haven\'t completed the shipment. Going back will leave the shipment as "In Progress" in SharePoint with whatever photos are already uploaded. You can resume it from Recent Orders.',
-    'Yes, leave',
+    'Leave without saving?',
+    'Photos you\'ve taken this session haven\'t been uploaded yet — they\'ll be lost if you leave now. Use "Save & Come Back Later" (at the bottom of the screen) to upload your photos first, then resume from Recent Orders.',
+    'Leave anyway',
     () => {
       closeDialog();
-      // Reset local state but DO NOT delete the Shipments row — it stays
-      // as "In Progress" so the user can find it later via Recent Orders.
       stopPhotoCamera();
       resetState();
       showScreen('screen-scan');
@@ -1409,26 +2728,39 @@ function captureBack(){
 //  SUBMIT — uploads any new photos and finalizes shipment
 // ═══════════════════════════════════════════════════
 async function submitShipment(){
+  if(S.isShippingLabel){ await submitShippingLabel(); return; }
+
   // Validation
-  const allStagesPresent = STAGES.every(s => (S.stages[s.id]?.photos?.length || 0) > 0);
+  const stages = activeStages();
+  const allStagesPresent = stages.every(s => {
+    const st = S.stages[s.id];
+    return (st?.photos?.length || 0) > 0 || st?.na === true;
+  });
   if(!S.isReopen && !allStagesPresent){
-    toast('All 5 stages need at least 1 photo','err'); return;
+    const missing = stages.filter(s => {
+      const st = S.stages[s.id];
+      return (st?.photos?.length || 0) === 0 && st?.na !== true;
+    }).length;
+    toast(`${missing} stage${missing!==1?'s':''} still need at least 1 photo (or mark N/A)`,'err');
+    return;
   }
 
-  const newPhotos = []; // [{stageId, dataUrl, sequence}]
-  for(const stage of STAGES){
-    const st = S.stages[stage.id];
-    if(!st) continue;
-    for(let i=st.savedCount; i<st.photos.length; i++){
-      newPhotos.push({stageId: stage.id, dataUrl: st.photos[i], sequence: i+1});
+  // Validate that every added lift has at least one photo
+  const liftSt = S.stages['M_CLifts'];
+  if(liftSt && !liftSt.na){
+    const emptyLifts = (liftSt.lifts||[]).filter(l => l.photos.length === 0);
+    if(emptyLifts.length > 0){
+      toast(`Lift${emptyLifts.length>1?'s':''} #${emptyLifts.map(l=>l.num).join(', #')} need at least 1 photo`,'err');
+      return;
     }
   }
 
-  if(S.isReopen && newPhotos.length === 0){
-    toast('No new photos to upload','err'); return;
-  }
+  const newPhotos = collectNewPhotos(stages);
 
-  showOverlay(`Uploading 0/${newPhotos.length}…`);
+  const commentEl = document.getElementById('order-comment');
+  S.orderComment = (commentEl?.value || '').trim().slice(0,100);
+
+  showOverlay(newPhotos.length > 0 ? `Uploading 0/${newPhotos.length}…` : 'Closing order…');
   try{
     const token = await getToken();
     await ensureSpIds(token);
@@ -1460,6 +2792,7 @@ async function submitShipment(){
         Reason_Note:            S.isReopen ? (S.reopenNote||'') : '',
         Is_Deleted:             false,
       };
+      if(p._lift && (p._lift.tags||[]).length) fields.Lift_Tags = JSON.stringify(p._lift.tags);
       try{
         await spCreateListItem(token, CFG.listPhotos, fields);
       }catch(err){
@@ -1470,27 +2803,37 @@ async function submitShipment(){
       }
 
       // Mark as saved locally so a retry won't re-upload it
-      const st = S.stages[p.stageId];
-      st.savedCount = Math.max(st.savedCount, p.sequence);
+      if(p._lift){ p._lift.savedCount = Math.max(p._lift.savedCount, p.sequence); syncLiftPhotos(S.stages['M_CLifts']); }
+      else { const st = S.stages[p.stageId]; st.savedCount = Math.max(st.savedCount, p.sequence); }
       done++;
     }
 
-    // Mark shipment as Complete (only on first finalize; reopen leaves status alone)
-    if(!S.isReopen && S.shipmentItemId){
-      try{
-        await spPatchListItem(token, CFG.listShipments, S.shipmentItemId, {
-          Status: 'Complete',
-          Completed_DateTime: new Date().toISOString(),
-        });
-      }catch(err){
-        // Non-fatal — the shipment row exists, just status didn't flip.
-        console.warn('Could not mark shipment Complete:', err.message);
+    // Mark shipment as Complete.
+    // Runs on first finalize AND on reopen (so a stuck "In Progress" can self-heal).
+    // Retries once on failure; surfaces a visible error if both attempts fail.
+    if(S.shipmentItemId){
+      let patchOk = false;
+      for(let attempt = 0; attempt < 2 && !patchOk; attempt++){
+        if(attempt > 0) await new Promise(r => setTimeout(r, 1500));
+        try{
+          await spPatchListItem(token, CFG.listShipments, S.shipmentItemId, {
+            Status: 'Complete',
+            Completed_DateTime: new Date().toISOString(),
+            Order_Comment: S.orderComment || '',
+          });
+          patchOk = true;
+        }catch(err){
+          if(attempt === 1){
+            console.warn('Could not mark shipment Complete after retry:', err.message);
+            toast('⚠ Photos saved — but status update failed. Re-open the order to retry.', 'err');
+          }
+        }
       }
     }
 
     hideOverlay();
     if(S.isReopen){
-      toast('Photos uploaded','ok');
+      toast(newPhotos.length > 0 ? 'Photos uploaded — order marked Complete' : 'Order marked Complete','ok');
       const orderNum = S.orderNum, shipmentId = S.shipmentId;
       document.getElementById('detail-stages').innerHTML =
         '<div class="empty-state"><div class="empty-icon">⏳</div>Loading photos…</div>';
@@ -1507,9 +2850,155 @@ async function submitShipment(){
   }
 }
 
+// ═══════════════════════════════════════════════════
+//  SAVE FOR LATER — uploads photos without completing
+// ═══════════════════════════════════════════════════
+async function saveForLater(){
+  const stages = activeStages();
+  const newPhotos = collectNewPhotos(stages);
+
+  if(newPhotos.length === 0){
+    toast('Progress saved — find this order in Recent Orders to continue','ok');
+    resetState();
+    showScreen('screen-scan');
+    return;
+  }
+
+  showOverlay(`Saving ${newPhotos.length} photo${newPhotos.length!==1?'s':''}…`);
+  try{
+    const token = await getToken();
+    await ensureSpIds(token);
+    const userName  = S.user?.name     || S.user?.username || '';
+    const userEmail = S.user?.username || S.user?.name     || '';
+    const now = new Date().toISOString();
+
+    let done = 0;
+    for(const p of newPhotos){
+      showOverlay(`Saving ${done+1}/${newPhotos.length} (${p.stageId})…`);
+      const blob     = dataUrlToBlob(p.dataUrl);
+      const fileName = `${S.shipmentId}_${p.stageId}_${p.sequence}_${Date.now()}.jpg`;
+      const folderPath = `${S.orderNum}/${S.shipmentId}/${p.stageId}`;
+      const spUrl    = await spUploadFile(token, folderPath, fileName, blob);
+
+      const slFields = {
+        Title:                  fileName,
+        GP_Order_Number:        S.orderNum,
+        Shipment_ID:            S.shipmentId,
+        Stage:                  p.stageId,
+        Photo_Sequence:         p.sequence,
+        SharePoint_URL:         spUrl,
+        File_Name:              fileName,
+        Captured_By:            userName,
+        Captured_Email:         userEmail,
+        Captured_DateTime:      now,
+        Added_After_Completion: false,
+        Reason_Code:            '',
+        Reason_Note:            '',
+        Is_Deleted:             false,
+      };
+      if(p._lift && (p._lift.tags||[]).length) slFields.Lift_Tags = JSON.stringify(p._lift.tags);
+      await spCreateListItem(token, CFG.listPhotos, slFields);
+
+      if(p._lift){ p._lift.savedCount = Math.max(p._lift.savedCount, p.sequence); syncLiftPhotos(S.stages['M_CLifts']); }
+      else { const st = S.stages[p.stageId]; st.savedCount = Math.max(st.savedCount, p.sequence); }
+      done++;
+    }
+
+    hideOverlay();
+    toast(`${done} photo${done!==1?'s':''} saved — find this order in Recent Orders to continue`, 'ok');
+    resetState();
+    showScreen('screen-scan');
+  }catch(e){
+    hideOverlay();
+    console.error('saveForLater error:', e);
+    toast('Save failed: ' + e.message, 'err');
+  }
+}
+
+async function submitShippingLabel(){
+  const st = S.stages['ShippingLabel'] || {photos:[], savedCount:0, savedUrls:[]};
+  const newPhotos = [];
+  for(let i = st.savedCount; i < st.photos.length; i++){
+    newPhotos.push({dataUrl: st.photos[i], sequence: i+1});
+  }
+
+  showOverlay(newPhotos.length > 0 ? `Uploading 0/${newPhotos.length}…` : 'Marking as Shipped…');
+  try{
+    const token = await getToken();
+    await ensureSpIds(token);
+    const userName  = S.user?.name || S.user?.username || '';
+    const userEmail = S.user?.username || S.user?.name  || '';
+    const now = new Date().toISOString();
+
+    let done = 0;
+    for(const p of newPhotos){
+      showOverlay(`Uploading ${done+1}/${newPhotos.length} (Label)…`);
+      const blob = dataUrlToBlob(p.dataUrl);
+      const fileName = `${S.shipmentId}_ShippingLabel_${p.sequence}_${Date.now()}.jpg`;
+      const folderPath = `${S.orderNum}/${S.shipmentId}/ShippingLabel`;
+      const spUrl = await spUploadFile(token, folderPath, fileName, blob);
+
+      const fields = {
+        Title:                  fileName,
+        GP_Order_Number:        S.orderNum,
+        Shipment_ID:            S.shipmentId,
+        Stage:                  'ShippingLabel',
+        Photo_Sequence:         p.sequence,
+        SharePoint_URL:         spUrl,
+        File_Name:              fileName,
+        Captured_By:            userName,
+        Captured_Email:         userEmail,
+        Captured_DateTime:      now,
+        Added_After_Completion: true,
+        Reason_Code:            'ShippingLabel',
+        Reason_Note:            '',
+        Is_Deleted:             false,
+      };
+      try{
+        await spCreateListItem(token, CFG.listPhotos, fields);
+      }catch(err){
+        console.error('Label photo list-item create failed:', err.message);
+        throw new Error(`Label #${p.sequence}: ${err.message}`);
+      }
+      st.savedCount = Math.max(st.savedCount, p.sequence);
+      done++;
+    }
+
+    // Patch status to Shipped
+    if(S.shipmentItemId){
+      let patchOk = false;
+      for(let attempt = 0; attempt < 2 && !patchOk; attempt++){
+        if(attempt > 0) await new Promise(r => setTimeout(r, 1500));
+        try{
+          await spPatchListItem(token, CFG.listShipments, S.shipmentItemId, {
+            Status: 'Shipped',
+            Shipped_DateTime: now,
+          });
+          patchOk = true;
+        }catch(err){
+          if(attempt === 1){
+            console.warn('Could not mark Shipped after retry:', err.message);
+            toast('⚠ Photos saved — status update failed. Re-open to retry.', 'err');
+          }
+        }
+      }
+    }
+
+    hideOverlay();
+    toast(newPhotos.length > 0 ? 'Label uploaded — order marked Shipped ✓' : 'Order marked Shipped ✓', 'ok');
+    resetState();
+    showScreen('screen-scan');
+
+  }catch(e){
+    hideOverlay();
+    console.error('Label submit failed:', e);
+    toast('Upload failed: '+e.message, 'err');
+  }
+}
+
 function finalizeSubmitScreen(uploadedCount){
-  const totalPhotos = STAGES.reduce((acc,s) => acc + (S.stages[s.id]?.photos?.length||0), 0);
-  document.getElementById('done-order').textContent    = S.orderNum;
+  const totalPhotos = activeStages().reduce((acc,s) => acc + (S.stages[s.id]?.photos?.length||0), 0);
+  document.getElementById('done-order').textContent    = S.displayOrderNum || S.orderNum;
   document.getElementById('done-shipment').textContent = S.shipmentId;
   document.getElementById('done-photos').textContent   = totalPhotos;
   document.getElementById('done-user').textContent     = S.user?.name||S.user?.username||'';
@@ -1628,10 +3117,12 @@ function goBack(id){ stopScanner(); stopPhotoCamera(); showScreen(id); }
 
 function resetState(){
   stopScanner(); stopPhotoCamera();
-  S.orderNum=null; S.shipmentId=null; S.shipmentSeq=null; S.shipmentItemId=null;
+  S.orderNum=null; S.displayOrderNum=null; S.shipmentId=null; S.shipmentSeq=null; S.shipmentItemId=null;
   S.stages = {};
-  S.isReopen=false; S.reopenCode=''; S.reopenNote='';
+  S.isReopen=false; S.reopenCode=''; S.reopenNote=''; S.orderComment='';
+  S.isShippingLabel=false; S.isLWorkflow=false; S.isRainWorkflow=false; S.rainShipType=null;
   S.photoTargetStage=null;
+  clearSavedThumbCache();
   const orderInput = document.getElementById('order-input');
   if(orderInput) orderInput.value='';
 }
@@ -1695,20 +3186,26 @@ async function loadRecentOrders(){
     const token = await getToken();
     await ensureSpIds(token);
 
-    const cutoff = new Date(Date.now() - RECENT_DAYS*24*60*60*1000).toISOString();
+    // Format cutoff without milliseconds (SharePoint OData rejects .000Z in $filter).
+    const cutoff = new Date(Date.now() - RECENT_DAYS*24*60*60*1000).toISOString().replace(/\.\d+Z$/, 'Z');
+    const dateFilter = encodeURIComponent(`fields/Created ge '${cutoff}'`);
+    const prefer = 'HonorNonIndexedQueriesWarningMayFailRandomly';
 
-    // Shipments query
-    const shipFilter = `fields/Created ge '${cutoff}'`;
-    const shipUrl = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listShipments}/items`+
-      `?$expand=fields&$filter=${encodeURIComponent(shipFilter)}&$orderby=id desc&$top=500`;
-    const shipRes = await fetch(shipUrl, {
-      headers:{ Authorization:`Bearer ${token}`, Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly' }
-    });
-    if(!shipRes.ok){ const e=await shipRes.json(); throw new Error(e.error?.message||'Query failed'); }
-    const shipData = await shipRes.json();
-    const shipItems = (shipData.value||[]).filter(i => i.fields?.Is_Deleted !== true);
+    // Shipments — paginate through all pages so we never miss recent orders.
+    // $orderby=fields/Created desc ensures the first page has the newest rows,
+    // so even partial results are useful.
+    const allShipItems = [];
+    let shipNextUrl = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listShipments}/items`+
+      `?$expand=fields&$filter=${dateFilter}&$orderby=fields/Created desc&$top=500`;
+    while(shipNextUrl){
+      const res = await fetch(shipNextUrl, { headers:{ Authorization:`Bearer ${token}`, Prefer:prefer } });
+      if(!res.ok){ const e=await res.json().catch(()=>({})); throw new Error(e.error?.message||'Shipments query failed'); }
+      const data = await res.json();
+      allShipItems.push(...(data.value||[]).filter(i => i.fields?.Is_Deleted !== true));
+      shipNextUrl = data['@odata.nextLink'] || null;
+    }
 
-    const orders = shipItems.map(item => {
+    const orders = allShipItems.map(item => {
       const f = item.fields;
       return {
         shipmentItemId: item.id,
@@ -1722,18 +3219,25 @@ async function loadRecentOrders(){
         created:        f.Created || item.createdDateTime,
         photoCount:     0,
         latePhotoCount: 0,
+        comment:        f.Order_Comment || '',
       };
     });
 
-    // Photos query — count by shipment
-    const photoFilter = `fields/Created ge '${cutoff}'`;
-    const photoUrl = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listPhotos}/items`+
-      `?$expand=fields&$filter=${encodeURIComponent(photoFilter)}&$top=2000`;
-    const photoRes = await fetch(photoUrl, {
-      headers:{ Authorization:`Bearer ${token}`, Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly' }
-    });
-    const photoData = photoRes.ok ? await photoRes.json() : { value:[] };
-    const photos = (photoData.value||[]).filter(p => p.fields?.Is_Deleted !== true);
+    // Photos — same pagination pattern, filter server-side by date then client-side by shipmentId.
+    const shipIds = new Set(orders.map(o => o.shipmentId).filter(Boolean));
+    const allPhotos = [];
+    let photoNextUrl = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listPhotos}/items`+
+      `?$expand=fields&$filter=${dateFilter}&$top=2000`;
+    while(photoNextUrl){
+      const res = await fetch(photoNextUrl, { headers:{ Authorization:`Bearer ${token}`, Prefer:prefer } });
+      if(!res.ok) break; // non-fatal — counts show 0 rather than crashing
+      const data = await res.json();
+      allPhotos.push(...(data.value||[]).filter(p =>
+        p.fields?.Is_Deleted !== true && shipIds.has(p.fields?.Shipment_ID)
+      ));
+      photoNextUrl = data['@odata.nextLink'] || null;
+    }
+    const photos = allPhotos;
 
     const photoCount = {}, lateCount = {};
     for(const p of photos){
@@ -1747,6 +3251,7 @@ async function loadRecentOrders(){
       o.latePhotoCount = lateCount[o.shipmentId]  || 0;
     }
 
+    orders.sort((a,b) => new Date(b.started||b.created) - new Date(a.started||a.created));
     recentState.allOrders = orders;
     recentState.filtered  = [...orders];
     renderRecentList();
@@ -1757,12 +3262,95 @@ async function loadRecentOrders(){
   }
 }
 
+let _liveSearchTimer = null;
+
 function filterRecentOrders(val){
   const q = val.trim().toUpperCase();
+  clearTimeout(_liveSearchTimer);
+  _liveSearchTimer = null;
+
   recentState.filtered = !q
     ? [...recentState.allOrders]
-    : recentState.allOrders.filter(o => (o.orderNum||'').includes(q) || (o.shipmentId||'').includes(q));
-  renderRecentList();
+    : recentState.allOrders.filter(o =>
+        (o.orderNum||'').toUpperCase().includes(q) ||
+        (o.shipmentId||'').toUpperCase().includes(q));
+
+  if(q.length >= 4 && recentState.filtered.length === 0){
+    // No local match — show spinner then do a live SharePoint lookup
+    document.getElementById('recent-list').innerHTML =
+      '<div class="empty-state"><div class="empty-icon">⏳</div>Searching SharePoint…</div>';
+    _liveSearchTimer = setTimeout(() => liveSearchOrder(q), 800);
+  } else {
+    renderRecentList();
+  }
+}
+
+async function liveSearchOrder(q){
+  const container = document.getElementById('recent-list');
+  try{
+    const token = await getToken();
+    await ensureSpIds(token);
+    const prefer = 'HonorNonIndexedQueriesWarningMayFailRandomly';
+
+    const flt = encodeURIComponent(`startswith(fields/GP_Order_Number,'${q}')`);
+    const url = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listShipments}/items`+
+      `?$expand=fields&$filter=${flt}&$top=20`;
+    const res = await fetch(url, { headers:{ Authorization:`Bearer ${token}`, Prefer:prefer } });
+    if(!res.ok) throw new Error('Live search failed');
+    const data = await res.json();
+    const items = (data.value||[]).filter(i => i.fields?.Is_Deleted !== true);
+
+    if(items.length === 0){
+      container.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div>No orders found</div>';
+      return;
+    }
+
+    const orders = items.map(item => {
+      const flds = item.fields;
+      return {
+        shipmentItemId: item.id,
+        orderNum:       flds.GP_Order_Number || '',
+        shipmentId:     flds.Shipment_ID || '',
+        shipmentSeq:    flds.Shipment_Sequence || 1,
+        status:         flds.Status || 'In Progress',
+        packedBy:       flds.Packer_Name || flds.Packer_Email || '—',
+        started:        flds.Started_DateTime || flds.Created || item.createdDateTime,
+        completed:      flds.Completed_DateTime || null,
+        created:        flds.Created || item.createdDateTime,
+        photoCount:     0,
+        latePhotoCount: 0,
+        comment:        flds.Order_Comment || '',
+      };
+    });
+
+    // Fetch photo counts for each result
+    const photoCount = {}, lateCount = {};
+    for(const o of orders){
+      if(!o.shipmentId) continue;
+      const pf = encodeURIComponent(`fields/Shipment_ID eq '${o.shipmentId}'`);
+      const pu = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listPhotos}/items`+
+        `?$expand=fields&$filter=${pf}&$top=200`;
+      const pr = await fetch(pu, { headers:{ Authorization:`Bearer ${token}`, Prefer:prefer } });
+      if(pr.ok){
+        const pd = await pr.json();
+        for(const p of (pd.value||[]).filter(p => p.fields?.Is_Deleted !== true)){
+          photoCount[o.shipmentId] = (photoCount[o.shipmentId]||0)+1;
+          if(p.fields?.Added_After_Completion) lateCount[o.shipmentId] = (lateCount[o.shipmentId]||0)+1;
+        }
+      }
+    }
+    for(const o of orders){
+      o.photoCount     = photoCount[o.shipmentId] || 0;
+      o.latePhotoCount = lateCount[o.shipmentId]  || 0;
+    }
+
+    orders.sort((a,b) => new Date(b.started||b.created) - new Date(a.started||a.created));
+    recentState.filtered = orders;
+    renderRecentList();
+  }catch(e){
+    container.innerHTML =
+      `<div class="empty-state"><div class="empty-icon">❌</div>Search failed: ${e.message}</div>`;
+  }
 }
 
 function setRecentCount(n){
@@ -1789,16 +3377,19 @@ function renderRecentList(){
         ? `<span style="color:var(--amber);font-size:10px;"> (+${o.latePhotoCount} late)</span>`
         : '';
       const sid = o.shipmentId || o.orderNum;
+      const displayNum = detectWorkflow(o.orderNum).display;
       const suffix = sid !== o.orderNum
         ? `<span style="font-family:var(--font-mono);font-size:11px;color:var(--red);margin-left:6px;">${sid.replace(o.orderNum,'').replace(/^-/,'')}</span>`
         : '';
-      const statusBadge = o.status === 'Complete'
-        ? '<span class="badge badge-green" style="margin-left:6px;">✓</span>'
-        : '<span class="badge badge-amber" style="margin-left:6px;">In Progress</span>';
+      const statusBadge = o.status === 'Shipped'
+        ? '<span class="badge badge-blue" style="margin-left:6px;">🚚 Shipped</span>'
+        : o.status === 'Complete'
+          ? '<span class="badge badge-green" style="margin-left:6px;">✓</span>'
+          : '<span class="badge badge-amber" style="margin-left:6px;">In Progress</span>';
       return `
         <div class="order-row" onclick="selectRecentOrder('${sid}')">
           <div class="order-row-left">
-            <div class="order-row-num">${o.orderNum}${suffix}${statusBadge}</div>
+            <div class="order-row-num">${displayNum}${suffix}${statusBadge}</div>
             <div class="order-row-meta">${o.packedBy}</div>
           </div>
           <div class="order-row-right">
@@ -1825,8 +3416,9 @@ async function selectRecentOrder(shipmentIdOrOrderNum){
   const startedStr = order.started ? new Date(order.started).toLocaleString() : '—';
   const completedStr = order.completed ? new Date(order.completed).toLocaleString() : '—';
 
-  document.getElementById('detail-header-num').textContent  = order.shipmentId || order.orderNum;
-  document.getElementById('detail-order-num').textContent   = order.orderNum;
+  const detailDisplayNum = detectWorkflow(order.orderNum).display;
+  document.getElementById('detail-header-num').textContent  = order.shipmentId || detailDisplayNum;
+  document.getElementById('detail-order-num').textContent   = detailDisplayNum;
   document.getElementById('detail-shipment-id').textContent = order.shipmentId || '—';
   document.getElementById('detail-status').textContent      = order.status || '—';
   document.getElementById('detail-photo-count').textContent = order.photoCount + ' photo' + (order.photoCount!==1?'s':'')
@@ -1834,8 +3426,13 @@ async function selectRecentOrder(shipmentIdOrOrderNum){
   document.getElementById('detail-packed-by').textContent   = order.packedBy;
   document.getElementById('detail-started').textContent     = startedStr;
   document.getElementById('detail-completed').textContent   = completedStr;
+  document.getElementById('detail-comment').textContent     = order.comment || '—';
   document.getElementById('detail-stages').innerHTML =
     '<div class="empty-state"><div class="empty-icon">⏳</div>Loading photos…</div>';
+
+  const isInProgress = order.status === 'In Progress';
+  document.getElementById('btn-continue-shipment').style.display = isInProgress ? '' : 'none';
+  document.getElementById('btn-reopen-shipment').style.display   = isInProgress ? 'none' : '';
 
   showScreen('screen-detail');
   await loadOrderPhotoDetail(order.orderNum, order.shipmentId);
@@ -1883,19 +3480,27 @@ async function loadOrderPhotoDetail(orderNum, shipmentId){
       return;
     }
 
+    // Pick the right stage list based on order suffix
+    const _dwf = detectWorkflow(orderNum);
+    const detailStages =
+      _dwf.type==='L'  ? STAGES_L :
+      _dwf.type==='MC' ? [...STAGES_M_BUILD_CONTAINER,...STAGES_M_LOAD_CONTAINER] :
+      _dwf.type==='MT' ? [...STAGES_M_BUILD_TRAILER,...STAGES_M_LOAD_TRAILER] : STAGES;
+
     // Group by Stage
     const byStage = {};
-    for(const stage of STAGES) byStage[stage.id] = [];
+    for(const stage of detailStages) byStage[stage.id] = [];
     for(const p of allPhotos){
       const sid = p.Stage || 'Unknown';
       if(!byStage[sid]) byStage[sid] = [];
       byStage[sid].push(p);
     }
 
+    const allStageDefs = allKnownStages();
     const makeThumb = (p) => {
       const isLate = p.Added_After_Completion;
       const spUrl  = p.SharePoint_URL || '#';
-      const stageDef = STAGES.find(s => s.id === p.Stage);
+      const stageDef = allStageDefs.find(s => s.id === p.Stage);
       const lbl = (stageDef ? stageDef.label.split(' ')[0] : (p.Stage||'Photo')) + ' ' + (p.Photo_Sequence||'');
       const lateTag = isLate
         ? `<div class="late-tag" title="${p.Reason_Code||''}${p.Reason_Note?' — '+p.Reason_Note:''}">+Later</div>`
@@ -1909,7 +3514,7 @@ async function loadOrderPhotoDetail(orderNum, shipmentId){
       </div>`;
     };
 
-    let html = STAGES.map(stage => {
+    let html = detailStages.map(stage => {
       const photos = byStage[stage.id] || [];
       const count = photos.length;
       return `<div class="box-section">
@@ -1925,8 +3530,26 @@ async function loadOrderPhotoDetail(orderNum, shipmentId){
       </div>`;
     }).join('<div style="height:8px;"></div>');
 
-    // Surface any photos with unexpected Stage values (data drift / older rows)
-    const unknownPhotos = allPhotos.filter(p => !STAGES.some(s => s.id === p.Stage));
+    // Shipping Label section (always shown separately regardless of workflow)
+    const labelPhotos = allPhotos.filter(p => p.Stage === 'ShippingLabel');
+    if(labelPhotos.length > 0){
+      const lc = labelPhotos.length;
+      html += '<div style="height:8px;"></div>';
+      html += `<div class="box-section">
+        <div class="box-section-header">
+          <span class="box-section-title">${LABEL_STAGE.icon} &nbsp;${LABEL_STAGE.label}</span>
+          <span class="box-section-count">${lc} photo${lc!==1?'s':''}</span>
+        </div>
+        <div class="box-section-body">
+          <div class="photo-grid">${labelPhotos.map(makeThumb).join('')}</div>
+        </div>
+      </div>`;
+    }
+
+    // Show any photos whose stage wasn't rendered in the main sections above
+    // (e.g. RAIN-workflow photos on a standard B order, or vice-versa).
+    const shownIds = new Set([...detailStages.map(s=>s.id), 'ShippingLabel']);
+    const unknownPhotos = allPhotos.filter(p => !shownIds.has(p.Stage));
     if(unknownPhotos.length > 0){
       html += '<div style="height:8px;"></div>';
       html += `<div class="box-section">
@@ -2029,7 +3652,7 @@ function startReopenFlow(){
   const order = recentState.selectedOrder;
   if(!order) return;
 
-  document.getElementById('reason-order-num').textContent = order.orderNum;
+  document.getElementById('reason-order-num').textContent = detectWorkflow(order.orderNum).display;
   const dt = new Date(order.created);
   const dateStr = dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
   document.getElementById('reason-order-meta').textContent =
@@ -2102,37 +3725,68 @@ async function confirmReopen(){
       .sort((a,b) => (a.Photo_Sequence||0) - (b.Photo_Sequence||0));
 
     // Set up state
-    S.orderNum         = order.orderNum;
+    const wf = detectWorkflow(order.orderNum);
+    S.orderNum = order.orderNum;
+    applyWorkflowState(wf);
     S.shipmentId       = order.shipmentId;
     S.shipmentSeq      = order.shipmentSeq;
     S.shipmentItemId   = order.shipmentItemId;
     S.isReopen         = true;
+    S.isShippingLabel  = false;
     S.reopenCode       = reasonCode;
     S.reopenNote       = reasonNote;
+    S.orderComment     = order.comment || '';
     S.stages           = emptyStages();
 
     // Populate stage savedCount AND keep saved photos as placeholder
     // entries in `photos` so the user sees what's already there. Each
     // saved photo's dataUrl is the SharePoint URL — we'll let the camera
     // add NEW dataUrls past savedCount.
+    // Fallback: infer RAIN type from photo stage IDs if suffix wasn't in stored order number
+    if(!S.isRainWorkflow){
+      const inferred = inferRainTypeFromPhotos(photos);
+      if(inferred){ S.isRainWorkflow=true; S.rainShipType=inferred; S.stages=emptyStages(); }
+    }
+
     for(const p of photos){
       const sid = p.Stage;
+      if(sid && sid.startsWith('M_CLifts_')){
+        const liftNum = sid.slice('M_CLifts_'.length);
+        const st = S.stages['M_CLifts'];
+        if(st){
+          let lift = st.lifts.find(l => l.num === liftNum);
+          if(!lift){ lift = emptyLift(liftNum); st.lifts.push(lift); }
+          lift.photos.push(p.SharePoint_URL || '');
+          lift.savedCount++;
+          lift.savedMeta = lift.savedMeta || [];
+          lift.savedMeta.push({ url: p.SharePoint_URL||'', itemId: p.id||'', fileName: p.File_Name||'' });
+          if((!lift.tags || !lift.tags.length) && p.Lift_Tags){
+            try{ lift.tags = JSON.parse(p.Lift_Tags); }catch{ lift.tags = []; }
+          }
+          syncLiftPhotos(st);
+        }
+        continue;
+      }
       if(!S.stages[sid]) continue;
-      // Use SharePoint web URL as src — won't render directly without
-      // bearer-token thumbnail fetch, but renderCaptureScreen draws an
-      // <img> tag and the user just sees a broken-image fallback.
-      // Better: show a small "saved" placeholder block instead.
       S.stages[sid].photos.push(p.SharePoint_URL || '');
       S.stages[sid].savedUrls.push(p.SharePoint_URL || '');
       S.stages[sid].savedCount++;
+      S.stages[sid].savedMeta = S.stages[sid].savedMeta || [];
+      S.stages[sid].savedMeta.push({ url: p.SharePoint_URL||'', itemId: p.id||'', fileName: p.File_Name||'' });
     }
 
+    // Drop any saved photo entries whose files were deleted directly in SharePoint
+    showOverlay('Verifying saved photos…');
+    await validateSavedPhotos(token);
+
     // UI labels
-    document.getElementById('capture-order-label').textContent = S.orderNum;
-    document.getElementById('progress-order-num').textContent  = S.orderNum;
+    document.getElementById('capture-order-label').textContent = S.displayOrderNum || S.orderNum;
+    document.getElementById('progress-order-num').textContent  = S.displayOrderNum || S.orderNum;
     document.getElementById('progress-tagline').textContent    =
       `Re-opened ${S.shipmentId} — ${reasonCode}`;
     document.getElementById('capture-reopen-badge').style.display = 'inline-flex';
+    const commentEl = document.getElementById('order-comment');
+    if(commentEl){ commentEl.value = S.orderComment; updateCommentCounter(); }
 
     hideOverlay();
     renderCaptureScreen();
@@ -2143,6 +3797,193 @@ async function confirmReopen(){
     hideOverlay();
     console.error('confirmReopen error:', e);
     toast('Failed to re-open: '+e.message,'err');
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  VALIDATE SAVED PHOTOS AGAINST SHAREPOINT
+//  Checks each saved URL; removes entries whose files are gone (404).
+//  Call after building S.stages from metadata, before rendering.
+// ═══════════════════════════════════════════════════
+// Saved photos are stored as plain SharePoint URLs; resolve to a fetched,
+// authenticated blob URL for display when one has been cached, otherwise
+// fall back to the raw value (new captures are already local data URLs).
+function resolvePhotoSrc(src){
+  if(src && src.startsWith('http')) return S.savedThumbCache[src] || src;
+  return src;
+}
+
+function clearSavedThumbCache(){
+  for(const url of Object.values(S.savedThumbCache)) URL.revokeObjectURL(url);
+  S.savedThumbCache = {};
+}
+
+async function validateSavedPhotos(token){
+  // Collect every saved URL from all stages
+  const checks = [];
+  for(const [sid, st] of Object.entries(S.stages)){
+    if(sid === 'M_CLifts'){
+      for(const lift of (st.lifts || [])){
+        for(let i = 0; i < (lift.savedCount || 0); i++){
+          if(lift.photos[i]?.startsWith('http')) checks.push(lift.photos[i]);
+        }
+      }
+    } else {
+      for(let i = 0; i < (st.savedCount || 0); i++){
+        if(st.photos[i]?.startsWith('http')) checks.push(st.photos[i]);
+      }
+    }
+  }
+  if(!checks.length) return;
+
+  // Probe each URL via the thumbnail endpoint (5 concurrent); collect dead
+  // ones and cache a displayable blob URL for the live ones.
+  const dead = new Set();
+  let ci = 0;
+  const worker = async () => {
+    while(ci < checks.length){
+      const url = checks[ci++];
+      try{
+        const marker = '/' + CFG.photoLibrary + '/';
+        const pos = url.indexOf(marker);
+        if(pos < 0){ dead.add(url); continue; }
+        const rel = decodeURIComponent(url.substring(pos + marker.length));
+        const enc = rel.split('/').map(encodeURIComponent).join('/');
+        const thumbUrl = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/drives/${S.spDriveId}/root:/${enc}:/thumbnails/0/large/content`;
+        const res = await fetch(thumbUrl, { headers:{ Authorization:`Bearer ${token}` } });
+        if(!res.ok){ dead.add(url); continue; }
+        const blob = await res.blob();
+        S.savedThumbCache[url] = URL.createObjectURL(blob);
+      }catch{ dead.add(url); }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(5, checks.length) }, worker));
+
+  if(!dead.size) return;
+
+  // Purge dead entries from S.stages
+  for(const [sid, st] of Object.entries(S.stages)){
+    if(sid === 'M_CLifts'){
+      for(const lift of (st.lifts || [])){
+        const valid = lift.photos.slice(0, lift.savedCount).filter(u => !dead.has(u));
+        lift.photos  = [...valid, ...lift.photos.slice(lift.savedCount)];
+        lift.savedCount = valid.length;
+      }
+      syncLiftPhotos(st);
+    } else {
+      const valid = st.photos.slice(0, st.savedCount).filter(u => !dead.has(u));
+      st.photos    = [...valid, ...st.photos.slice(st.savedCount)];
+      st.savedCount = valid.length;
+      st.savedUrls  = (st.savedUrls || []).filter(u => !dead.has(u));
+    }
+  }
+  console.log(`[validateSavedPhotos] removed ${dead.size} deleted photo(s) from local state`);
+}
+
+// ═══════════════════════════════════════════════════
+//  CONTINUE IN-PROGRESS SHIPMENT
+// ═══════════════════════════════════════════════════
+async function continueShipment(){
+  const order = recentState.selectedOrder;
+  if(!order) return;
+
+  showOverlay('Loading saved photos…');
+  try{
+    const token = await getToken();
+    await ensureSpIds(token);
+
+    const filterExpr = `fields/Shipment_ID eq '${order.shipmentId.replace(/'/g,"''")}'`;
+    const url = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listPhotos}/items`+
+      `?$expand=fields&$filter=${encodeURIComponent(filterExpr)}&$top=500`;
+    let res = await fetch(url, {
+      headers:{ Authorization:`Bearer ${token}`, Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly' }
+    });
+    let data;
+    if(res.ok){
+      data = await res.json();
+    } else {
+      const fb = await fetch(
+        `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listPhotos}/items?$expand=fields&$top=500`,
+        { headers:{ Authorization:`Bearer ${token}`, Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly' } }
+      );
+      if(!fb.ok) throw new Error('Could not load existing photos');
+      data = await fb.json();
+    }
+    const photos = (data.value||[])
+      .filter(p => p.fields?.Is_Deleted !== true)
+      .filter(p => p.fields?.Shipment_ID === order.shipmentId)
+      .map(p => p.fields)
+      .sort((a,b) => (a.Photo_Sequence||0) - (b.Photo_Sequence||0));
+
+    const wf = detectWorkflow(order.orderNum);
+    S.orderNum = order.orderNum;
+    applyWorkflowState(wf);
+    S.shipmentId      = order.shipmentId;
+    S.shipmentSeq     = order.shipmentSeq;
+    S.shipmentItemId  = order.shipmentItemId;
+    S.isReopen        = false;
+    S.isShippingLabel = false;
+    S.reopenCode      = '';
+    S.reopenNote      = '';
+    S.orderComment    = order.comment || '';
+    S.stages          = emptyStages();
+
+    // Fallback: infer RAIN type from photo stage IDs if suffix wasn't in stored order number
+    if(!S.isRainWorkflow){
+      const inferred = inferRainTypeFromPhotos(photos);
+      if(inferred){ S.isRainWorkflow=true; S.rainShipType=inferred; S.stages=emptyStages(); }
+    }
+
+    for(const p of photos){
+      const sid = p.Stage;
+      if(sid && sid.startsWith('M_CLifts_')){
+        const liftNum = sid.slice('M_CLifts_'.length);
+        const st = S.stages['M_CLifts'];
+        if(st){
+          let lift = st.lifts.find(l => l.num === liftNum);
+          if(!lift){ lift = emptyLift(liftNum); st.lifts.push(lift); }
+          lift.photos.push(p.SharePoint_URL || '');
+          lift.savedCount++;
+          lift.savedMeta = lift.savedMeta || [];
+          lift.savedMeta.push({ url: p.SharePoint_URL||'', itemId: p.id||'', fileName: p.File_Name||'' });
+          if((!lift.tags || !lift.tags.length) && p.Lift_Tags){
+            try{ lift.tags = JSON.parse(p.Lift_Tags); }catch{ lift.tags = []; }
+          }
+          syncLiftPhotos(st);
+        }
+        continue;
+      }
+      if(!S.stages[sid]) continue;
+      S.stages[sid].photos.push(p.SharePoint_URL || '');
+      S.stages[sid].savedUrls.push(p.SharePoint_URL || '');
+      S.stages[sid].savedCount++;
+      S.stages[sid].savedMeta = S.stages[sid].savedMeta || [];
+      S.stages[sid].savedMeta.push({ url: p.SharePoint_URL||'', itemId: p.id||'', fileName: p.File_Name||'' });
+    }
+
+    // Drop any saved photo entries whose files were deleted directly in SharePoint
+    showOverlay('Verifying saved photos…');
+    await validateSavedPhotos(token);
+
+    document.getElementById('capture-order-label').textContent = S.displayOrderNum || S.orderNum;
+    document.getElementById('progress-order-num').textContent  = S.displayOrderNum || S.orderNum;
+    document.getElementById('progress-tagline').textContent    = `Continuing ${S.shipmentId}`;
+    document.getElementById('capture-reopen-badge').style.display = 'none';
+    const commentEl = document.getElementById('order-comment');
+    if(commentEl){ commentEl.value = S.orderComment; updateCommentCounter(); }
+
+    hideOverlay();
+    renderCaptureScreen();
+    showScreen('screen-capture');
+    if(photos.length > 0){
+      toast(`${photos.length} saved photo${photos.length!==1?'s':''} loaded — continue where you left off`, 'ok');
+    } else {
+      toast('No saved photos yet — start capturing', 'ok');
+    }
+  }catch(e){
+    hideOverlay();
+    console.error('continueShipment error:', e);
+    toast('Could not load shipment: ' + e.message, 'err');
   }
 }
 
@@ -2298,12 +4139,34 @@ async function confirmDeleteShipment(){
 //  DUPLICATE ORDER DIALOG
 // ═══════════════════════════════════════════════════
 function showDupDialog(orderNum, shipments){
-  dupState.shipments = shipments;
-  dupState.selected  = null;
-  dupState.orderNum  = orderNum;
+  dupState.shipments   = shipments;
+  dupState.selected    = null;
+  dupState.orderNum    = orderNum;
+  dupState.labelTarget = null;
 
-  document.getElementById('dup-sub-text').textContent =
-    `"${orderNum}" has ${shipments.length} previous shipment${shipments.length!==1?'s':''}. Select one to view or add photos, or start a new shipment event.`;
+  // Show label CTA when the most-recent shipment is Complete or Shipped
+  const latest        = shipments[0];
+  const showLabelCTA  = latest && (latest.status === 'Complete' || latest.status === 'Shipped');
+  const labelDiv      = document.getElementById('dup-label-action');
+  const labelDivider  = document.getElementById('dup-label-divider');
+
+  if(showLabelCTA){
+    dupState.labelTarget = latest;
+    const dt      = new Date(latest.started || latest.created);
+    const dateStr = dt.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    const alreadyShipped = latest.status === 'Shipped';
+    document.getElementById('dup-label-sub').textContent =
+      `${latest.shipmentId} · ${alreadyShipped ? 'Already shipped' : 'Packing complete'} · ${dateStr} · ${latest.packedBy}`;
+    labelDiv.style.display     = 'block';
+    labelDivider.style.display = 'block';
+    document.getElementById('dup-sub-text').textContent =
+      `"${orderNum}" — packing is complete. Add shipping label photos, or choose another action below.`;
+  } else {
+    labelDiv.style.display     = 'none';
+    labelDivider.style.display = 'none';
+    document.getElementById('dup-sub-text').textContent =
+      `"${orderNum}" has ${shipments.length} previous shipment${shipments.length!==1?'s':''}. Select one to view or add photos, or start a new shipment event.`;
+  }
 
   const list = document.getElementById('dup-shipment-list');
   list.innerHTML = shipments.map((s,i) => {
@@ -2333,7 +4196,77 @@ function selectDupShipment(idx){
 
 function closeDupDialog(){
   document.getElementById('dup-dialog-bg').classList.remove('show');
-  dupState = { shipments:[], selected:null, orderNum:null };
+  dupState = { shipments:[], selected:null, orderNum:null, labelTarget:null };
+}
+
+async function dupAddShippingLabel(){
+  const s = dupState.labelTarget || dupState.shipments[0];
+  if(!s) return;
+  closeDupDialog();
+
+  showOverlay('Loading shipment…');
+  try{
+    const token = await getToken();
+    await ensureSpIds(token);
+
+    // Fetch any existing ShippingLabel photos for this shipment
+    const filterExpr = `fields/Shipment_ID eq '${s.shipmentId.replace(/'/g,"''")}'`;
+    const url = `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listPhotos}/items`+
+      `?$expand=fields&$filter=${encodeURIComponent(filterExpr)}&$top=500`;
+    let res = await fetch(url,{headers:{Authorization:`Bearer ${token}`,Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly'}});
+    let data;
+    if(res.ok){ data = await res.json(); }
+    else{
+      const fb = await fetch(
+        `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${CFG.listPhotos}/items?$expand=fields&$top=500`,
+        {headers:{Authorization:`Bearer ${token}`,Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly'}}
+      );
+      if(!fb.ok) throw new Error('Could not load existing photos');
+      data = await fb.json();
+    }
+    const existingLabel = (data.value||[])
+      .filter(p => p.fields?.Is_Deleted !== true && p.fields?.Shipment_ID === s.shipmentId && p.fields?.Stage === 'ShippingLabel')
+      .sort((a,b) => (a.fields?.Photo_Sequence||0) - (b.fields?.Photo_Sequence||0));
+
+    // Set up state
+    const rawOrderNum = dupState.orderNum || s.shipmentId.split('-S')[0];
+    const wf2 = detectWorkflow(rawOrderNum);
+    S.orderNum = rawOrderNum;
+    applyWorkflowState(wf2);
+    S.shipmentId          = s.shipmentId;
+    S.shipmentSeq         = s.seq;
+    S.shipmentItemId      = s.shipmentItemId;
+    S.isShippingLabel     = true;
+    S.isReopen            = false;
+    S.reopenCode          = '';
+    S.reopenNote          = '';
+    S.orderComment        = s.comment || '';
+    S.stages          = {};
+    S.stages['ShippingLabel'] = {
+      photos:     existingLabel.map(p => p.fields?.SharePoint_URL || ''),
+      savedCount: existingLabel.length,
+      savedUrls:  existingLabel.map(p => p.fields?.SharePoint_URL || ''),
+    };
+
+    // Configure capture screen header
+    document.getElementById('capture-order-label').textContent = S.displayOrderNum || S.orderNum;
+    document.getElementById('progress-order-num').textContent  = S.displayOrderNum || S.orderNum;
+    document.getElementById('progress-tagline').textContent    = `${S.shipmentId} — shipping label photo`;
+    const badge = document.getElementById('capture-reopen-badge');
+    badge.textContent    = '🏷️ Label';
+    badge.style.display  = 'inline-flex';
+
+    const commentEl = document.getElementById('order-comment');
+    if(commentEl){ commentEl.value = S.orderComment; updateCommentCounter(); }
+
+    hideOverlay();
+    renderCaptureScreen();
+    showScreen('screen-capture');
+
+  }catch(e){
+    hideOverlay();
+    toast('Failed to load shipment: '+e.message,'err');
+  }
 }
 
 function dupViewPrevious(){
@@ -2352,19 +4285,22 @@ function dupViewPrevious(){
     created:         s.created,
     photoCount:      s.photoCount||0,
     latePhotoCount:  0,
+    comment:         s.comment||'',
   };
   closeDupDialog();
   const dt = new Date(s.created);
   const startedStr = s.started ? new Date(s.started).toLocaleString() : '—';
   const completedStr = s.completed ? new Date(s.completed).toLocaleString() : '—';
+  const dupDisplayNum = detectWorkflow(orderNum).display;
   document.getElementById('detail-header-num').textContent  = s.shipmentId;
-  document.getElementById('detail-order-num').textContent   = orderNum;
+  document.getElementById('detail-order-num').textContent   = dupDisplayNum;
   document.getElementById('detail-shipment-id').textContent = s.shipmentId;
   document.getElementById('detail-status').textContent      = s.status || '—';
   document.getElementById('detail-photo-count').textContent = (s.photoCount||0) + ' photos';
   document.getElementById('detail-packed-by').textContent   = s.packedBy;
   document.getElementById('detail-started').textContent     = startedStr;
   document.getElementById('detail-completed').textContent   = completedStr;
+  document.getElementById('detail-comment').textContent     = s.comment || '—';
   document.getElementById('detail-stages').innerHTML =
     '<div class="empty-state"><div class="empty-icon">⏳</div>Loading photos…</div>';
   showScreen('screen-detail');
@@ -2385,6 +4321,7 @@ async function dupAddToExisting(){
     completed:       s.completed,
     created:         s.created,
     photoCount:      s.photoCount||0,
+    comment:         s.comment||'',
   };
   closeDupDialog();
   startReopenFlow();
@@ -2393,18 +4330,293 @@ async function dupAddToExisting(){
 function dupStartNew(){
   const maxSeq = dupState.shipments.reduce((m,s)=>Math.max(m, Number(s.seq)||1), 0);
 
-  S.orderNum       = dupState.orderNum;
-  S.shipmentSeq    = maxSeq + 1;
-  S.shipmentId     = `${dupState.orderNum}-S${S.shipmentSeq}`;
-  S.shipmentItemId = null;
-  S.isReopen       = false;
-  S.reopenCode     = '';
-  S.reopenNote     = '';
-  S.stages         = emptyStages();
+  const rawNum = dupState.orderNum;
+  const wf = detectWorkflow(rawNum);
+  S.orderNum = rawNum;
+  applyWorkflowState(wf);
+  S.shipmentSeq     = maxSeq + 1;
+  S.shipmentId      = `${rawNum}-S${S.shipmentSeq}`;
+  S.shipmentItemId  = null;
+  S.isReopen        = false;
+  S.reopenCode      = '';
+  S.reopenNote      = '';
+  S.orderComment    = '';
+  S.isShippingLabel = false;
+  S.stages          = emptyStages();
 
   closeDupDialog();
-  document.getElementById('confirm-num').textContent = dupState.orderNum;
+  document.getElementById('confirm-num').textContent = S.displayOrderNum || S.orderNum;
+  document.getElementById('confirm-hero-sub').textContent =
+    S.isRainWorkflow ? 'RAIN Machine Order' :
+    wf.type==='L'    ? 'Work Order Number'  : 'GP Order Number';
+  document.getElementById('confirm-help-text').textContent =
+    S.isRainWorkflow
+      ? 'This is a RAIN Machine order. Select Trailer or Container below, then tap "Confirm & Continue" to begin.'
+      : wf.type==='L'
+        ? 'Confirm this order number matches your Google Sheet work order. All photos will be filed under this number.'
+        : 'Confirm this order number matches your picking ticket. All photos will be filed under this number.';
+  const rainCard2 = document.getElementById('rain-type-card');
+  if(rainCard2) rainCard2.style.display = S.isRainWorkflow ? '' : 'none';
   showScreen('screen-confirm');
+}
+
+// ═══════════════════════════════════════════════════
+//  PARTS LOOKUP (WMS)
+//  PartMaster  = GP item data, refreshed weekly by Power Automate (read-only here)
+//  Locations   = valid location / sublocation pairs (read-only here)
+//  PartLocations(_TEST) = part → location assignments, owned by this app
+// ═══════════════════════════════════════════════════
+const PL_PREFER = 'HonorNonIndexedQueriesWarningMayFailRandomly';
+const partsState = { results:[], part:null, assignments:[], locList:null, searchSeq:0, debounce:null };
+
+const plOdata = s => String(s).replace(/'/g,"''");
+const plHtml  = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const plListUrl = (list) => `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${list}/items`;
+
+async function plToken(){ const t = await getToken(); await ensureSpIds(t); return t; }
+
+async function plGetPages(token, url, maxPages){
+  const out = [];
+  let pages = 0;
+  while(url && pages < (maxPages || Infinity)){
+    const res = await fetch(url, { headers:{ Authorization:`Bearer ${token}`, Prefer:PL_PREFER } });
+    if(!res.ok){ const e = await res.json().catch(()=>({})); throw new Error(e.error?.message || `Request failed (${res.status})`); }
+    const d = await res.json();
+    out.push(...(d.value || []));
+    url = d['@odata.nextLink'] || null;
+    pages++;
+  }
+  return out;
+}
+
+async function spDeleteListItem(token, listName, itemId){
+  const res = await fetch(`${plListUrl(listName)}/${itemId}`, { method:'DELETE', headers:{ Authorization:`Bearer ${token}` } });
+  if(!res.ok && res.status !== 404){
+    const e = await res.json().catch(()=>({}));
+    throw new Error(e.error?.message || `Delete failed (${res.status})`);
+  }
+}
+
+function openPartsLookup(){
+  const name = S.user?.name || S.user?.username || '';
+  const initials = name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+  document.getElementById('av-parts').textContent = initials;
+  document.getElementById('nm-parts').textContent = name;
+  partsState.results = [];
+  const inp = document.getElementById('parts-search');
+  inp.value = '';
+  document.getElementById('parts-list').innerHTML =
+    '<div class="empty-state"><div class="empty-icon">📍</div>Enter a part number</div>';
+  showScreen('screen-parts');
+  inp.focus();
+  plLoadLocations().catch(()=>{});
+}
+
+async function plLoadLocations(){
+  if(partsState.locList) return partsState.locList;
+  const token = await plToken();
+  const items = await plGetPages(token, `${plListUrl(CFG.listLocations)}?$expand=fields&$top=999`);
+  const map = new Map();
+  items.forEach(it => {
+    const f = it.fields || {};
+    const loc = String(f.Title || '').trim();
+    if(!loc) return;
+    if(!map.has(loc)) map.set(loc, new Set());
+    const sub = String(f.Sublocation ?? f.SubLocation ?? '').trim();
+    if(sub) map.get(loc).add(sub);
+  });
+  const cmp = (a,b) => a.localeCompare(b, undefined, { numeric:true, sensitivity:'base' });
+  partsState.locList = [...map.keys()].sort(cmp).map(name => ({ name, subs:[...map.get(name)].sort(cmp) }));
+  return partsState.locList;
+}
+
+// ── Search ──────────────────────────────────────────
+function onPartsSearchInput(el){
+  el.value = el.value.toUpperCase();
+  clearTimeout(partsState.debounce);
+  partsState.debounce = setTimeout(() => searchParts(el.value.trim()), 350);
+}
+function searchPartsNow(){
+  clearTimeout(partsState.debounce);
+  searchParts(document.getElementById('parts-search').value.trim());
+}
+
+async function searchParts(q){
+  const list = document.getElementById('parts-list');
+  if(q.length < 2){
+    partsState.searchSeq++;
+    list.innerHTML = '<div class="empty-state"><div class="empty-icon">📍</div>Enter at least 2 characters</div>';
+    return;
+  }
+  const seq = ++partsState.searchSeq;
+  list.innerHTML = '<div class="empty-state"><div class="empty-icon">⏳</div>Searching…</div>';
+  try{
+    const token = await plToken();
+    const flt = encodeURIComponent(`startswith(fields/ItemNumber,'${plOdata(q)}')`);
+    const items = await plGetPages(token, `${plListUrl(CFG.listPartMaster)}?$expand=fields&$filter=${flt}&$top=25`, 1);
+    if(seq !== partsState.searchSeq) return;
+    partsState.results = items.map(it => {
+      const f = it.fields || {};
+      return {
+        itemNumber:  String(f.ItemNumber || '').trim(),
+        description: String(f.Description || '').trim(),
+        cls:         String(f.Class || '').trim(),
+        weight:      (f.Weight === undefined || f.Weight === null || f.Weight === '') ? null : Number(f.Weight),
+      };
+    }).sort((a,b) => a.itemNumber.localeCompare(b.itemNumber, undefined, { numeric:true }));
+    renderPartsList(q);
+  }catch(e){
+    if(seq !== partsState.searchSeq) return;
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div>${plHtml(e.message)}</div>`;
+  }
+}
+
+function renderPartsList(q){
+  const list = document.getElementById('parts-list');
+  const rows = partsState.results;
+  if(rows.length === 0){
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">🔍</div>No part found for “${plHtml(q)}”<div style="font-size:11px;font-weight:500;margin-top:8px;text-transform:none;letter-spacing:0;">Parts come from GP and refresh weekly.</div></div>`;
+    return;
+  }
+  list.innerHTML = '<div class="order-list">' + rows.map((p, i) => `
+    <div class="order-row" onclick="openPart(${i})">
+      <div class="order-row-left">
+        <div class="order-row-num">${plHtml(p.itemNumber)}</div>
+        <div class="part-row-desc">${plHtml(p.description) || '—'}</div>
+      </div>
+      <div class="order-row-right">${p.cls ? `<span class="badge badge-gray">${plHtml(p.cls)}</span>` : ''}</div>
+      <div class="order-row-chevron">›</div>
+    </div>`).join('') + '</div>';
+}
+
+// ── Part detail ─────────────────────────────────────
+async function openPart(i){
+  const p = partsState.results[i];
+  if(!p) return;
+  partsState.part = p;
+  partsState.assignments = [];
+  document.getElementById('part-header-num').textContent = p.itemNumber;
+  document.getElementById('part-num').textContent   = p.itemNumber;
+  document.getElementById('part-desc').textContent  = p.description || '—';
+  document.getElementById('part-class').textContent = p.cls || '—';
+  const wRow = document.getElementById('part-weight-row');
+  if(p.weight && p.weight > 0){
+    document.getElementById('part-weight').textContent = `${p.weight} lb`;
+    wRow.style.display = '';
+  } else {
+    wRow.style.display = 'none';
+  }
+  document.getElementById('part-locs').innerHTML = '<div class="empty-state" style="padding:18px;">Loading…</div>';
+  showScreen('screen-part');
+  await Promise.all([ plFillLocationPicker(), loadPartAssignments() ]);
+}
+
+async function plFillLocationPicker(){
+  const sel = document.getElementById('part-loc-select');
+  sel.innerHTML = '<option value="">— Select a location —</option>';
+  document.getElementById('part-sub-wrap').style.display = 'none';
+  try{
+    const locs = await plLoadLocations();
+    sel.innerHTML += locs.map(l => `<option value="${plHtml(l.name)}">${plHtml(l.name)}</option>`).join('');
+  }catch(e){
+    toast('Could not load locations: ' + e.message, 'err');
+  }
+}
+
+function onPartLocChange(){
+  const loc = document.getElementById('part-loc-select').value;
+  const wrap = document.getElementById('part-sub-wrap');
+  const sub  = document.getElementById('part-sub-select');
+  const entry = (partsState.locList || []).find(l => l.name === loc);
+  if(entry && entry.subs.length){
+    sub.innerHTML = '<option value="">— Select a sublocation —</option>' +
+      entry.subs.map(s => `<option value="${plHtml(s)}">${plHtml(s)}</option>`).join('');
+    wrap.style.display = '';
+  } else {
+    sub.innerHTML = '<option value="">— Select a sublocation —</option>';
+    wrap.style.display = 'none';
+  }
+}
+
+async function loadPartAssignments(){
+  const p = partsState.part;
+  const box = document.getElementById('part-locs');
+  try{
+    const token = await plToken();
+    const flt = encodeURIComponent(`fields/PartNumber eq '${plOdata(p.itemNumber)}'`);
+    const items = await plGetPages(token, `${plListUrl(CFG.listPartLocations)}?$expand=fields&$filter=${flt}&$top=200`);
+    partsState.assignments = items.map(it => ({
+      id:  it.id,
+      loc: String(it.fields?.Location || '').trim(),
+      sub: String(it.fields?.SubLocation || '').trim(),
+    })).sort((a,b) => (a.loc + ' ' + a.sub).localeCompare(b.loc + ' ' + b.sub, undefined, { numeric:true }));
+    renderPartAssignments();
+  }catch(e){
+    box.innerHTML = `<div class="empty-state" style="padding:18px;">⚠️ ${plHtml(e.message)}</div>`;
+  }
+}
+
+function renderPartAssignments(){
+  const box = document.getElementById('part-locs');
+  const rows = partsState.assignments;
+  if(rows.length === 0){
+    box.innerHTML = '<div class="empty-state" style="padding:18px;">No location assigned yet</div>';
+    return;
+  }
+  box.innerHTML = rows.map((a, i) => `
+    <div class="loc-row">
+      <div><span class="loc-name">${plHtml(a.loc)}</span>${a.sub ? `<span class="loc-sub">${plHtml(a.sub)}</span>` : ''}</div>
+      <button class="loc-del" title="Remove" onclick="removePartLocation(${i})">🗑</button>
+    </div>`).join('');
+}
+
+async function addPartLocation(){
+  const p = partsState.part;
+  if(!p) return;
+  const loc = document.getElementById('part-loc-select').value;
+  if(!loc){ toast('Select a location', 'err'); return; }
+  const entry = (partsState.locList || []).find(l => l.name === loc);
+  const needsSub = !!(entry && entry.subs.length);
+  const sub = needsSub ? document.getElementById('part-sub-select').value : '';
+  if(needsSub && !sub){ toast('Select a sublocation', 'err'); return; }
+  if(partsState.assignments.some(a => a.loc === loc && a.sub === sub)){
+    toast('Already assigned to that location', 'err'); return;
+  }
+  // Title is SharePoint's required column — mirror the part number into it.
+  const fields = { Title:p.itemNumber, PartNumber:p.itemNumber, Location:loc };
+  if(sub) fields.SubLocation = sub;
+  showOverlay('Saving…');
+  try{
+    const token = await plToken();
+    await spCreateListItem(token, CFG.listPartLocations, fields);
+    document.getElementById('part-loc-select').value = '';
+    onPartLocChange();
+    await loadPartAssignments();
+    toast('Location added', 'ok');
+  }catch(e){
+    toast(e.message, 'err');
+  }finally{
+    hideOverlay();
+  }
+}
+
+function removePartLocation(i){
+  const a = partsState.assignments[i];
+  if(!a) return;
+  showDialog('Remove location', `Remove ${a.loc}${a.sub ? ' / ' + a.sub : ''} from ${partsState.part.itemNumber}?`, 'Remove', async () => {
+    closeDialog();
+    showOverlay('Removing…');
+    try{
+      const token = await plToken();
+      await spDeleteListItem(token, CFG.listPartLocations, a.id);
+      await loadPartAssignments();
+      toast('Location removed', 'ok');
+    }catch(e){
+      toast(e.message, 'err');
+    }finally{
+      hideOverlay();
+    }
+  });
 }
 
 </script>
