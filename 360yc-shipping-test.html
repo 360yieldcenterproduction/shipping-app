@@ -123,7 +123,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 #capture-canvas{display:none;}
 
 /* ── FULLSCREEN PHOTO CAMERA (stays open across multiple shots) ── */
-#photo-cam-wrap.cam-fullscreen{position:fixed;inset:0;z-index:6000;background:#000;display:flex;flex-direction:column;}
+#photo-cam-wrap.cam-fullscreen,#rt-cam.cam-fullscreen,#rt-scan.cam-fullscreen{position:fixed;inset:0;z-index:6000;background:#000;display:flex;flex-direction:column;}
 .cam-fs-header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:calc(env(safe-area-inset-top,0) + 12px) 14px 10px;}
 .cam-fs-label{font-family:var(--font-cond);font-weight:800;font-size:15px;letter-spacing:0.02em;color:#fff;}
 .cam-fs-count{font-size:12px;color:rgba(255,255,255,0.6);margin-top:2px;}
@@ -435,6 +435,29 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 .loc-del{background:transparent;border:1.5px solid var(--border);color:var(--text-muted);border-radius:var(--radius-sm);width:36px;height:36px;font-size:15px;flex-shrink:0;}
 .loc-del:hover{border-color:var(--red);color:var(--red);}
 .part-row-desc{font-size:12px;color:var(--text-dim);line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* ── RETURNS ── */
+.rt-age{font-family:var(--font-cond);font-size:13px;font-weight:800;letter-spacing:0.04em;color:var(--text-dim);}
+.rt-age.warn{color:var(--amber);}
+.rt-age.late{color:var(--red);}
+.rt-req{display:flex;align-items:center;gap:9px;padding:6px 0;font-size:14px;font-weight:600;color:var(--text-dim);}
+.rt-req-dot{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;flex-shrink:0;background:var(--gray-lt);color:var(--text-muted);border:1px solid var(--gray-mid);}
+.rt-req.ok{color:var(--text);}
+.rt-req.ok .rt-req-dot{background:var(--green);color:#fff;border-color:var(--green);}
+.rt-sec-actions{display:flex;gap:8px;}
+.rt-sec-actions .btn{flex:1;padding:10px 12px;font-size:13px;}
+.rt-shared-tag{position:absolute;top:3px;left:3px;background:var(--blue);border-radius:3px;font-family:var(--font-cond);font-size:8px;font-weight:800;letter-spacing:0.04em;color:#fff;padding:2px 5px;}
+.rt-sib-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);cursor:pointer;}
+.rt-sib-row:last-child{border-bottom:none;}
+#rt-sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,0.55);display:none;align-items:flex-end;justify-content:center;z-index:8000;padding-bottom:env(safe-area-inset-bottom,0);}
+#rt-sheet-bg.show{display:flex;}
+#rt-sheet{background:var(--surface);border-radius:var(--radius-lg) var(--radius-lg) 0 0;padding:20px 18px 24px;width:100%;max-width:480px;box-shadow:var(--shadow-lg);max-height:85vh;overflow-y:auto;display:flex;flex-direction:column;gap:9px;}
+#rt-sheet h3{font-family:var(--font-cond);font-size:17px;font-weight:900;letter-spacing:0.03em;text-transform:uppercase;color:var(--black);}
+#rt-sheet p{font-size:13px;color:var(--text-dim);line-height:1.5;}
+#rt-viewer-bg{position:fixed;inset:0;background:rgba(0,0,0,0.88);display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:8600;padding:16px;}
+#rt-viewer-bg.show{display:flex;}
+#rt-viewer-img{max-width:100%;max-height:58vh;border-radius:var(--radius-sm);background:#222;object-fit:contain;}
+.rt-viewer-panel{width:100%;max-width:480px;background:var(--surface);border-radius:var(--radius);padding:12px;display:flex;flex-direction:column;gap:9px;}
 </style>
 </head>
 <body>
@@ -508,6 +531,9 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     </button>
     <button class="btn btn-outline" onclick="openPartsLookup()" style="margin-top:0;border-color:var(--blue);color:var(--blue);">
       📍 &nbsp;Parts Lookup
+    </button>
+    <button class="btn btn-outline" onclick="rtOpenHub()" style="margin-top:0;border-color:var(--amber);color:var(--amber);">
+      ↩️ &nbsp;Returns
     </button>
     <div class="bottom-safe"></div>
   </div>
@@ -594,6 +620,203 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <select id="part-sub-select"><option value="">— Select a sublocation —</option></select>
       </div>
       <button class="btn btn-primary" onclick="addPartLocation()">＋ &nbsp;Add Location</button>
+    </div>
+    <div class="bottom-safe"></div>
+  </div>
+</div>
+
+<!-- ══ RETURNS — HUB ══ -->
+<div id="screen-returns" class="screen">
+  <div class="app-header">
+    <div class="h-left">
+      <button class="back-btn" onclick="rtLeave('screen-scan')">← Back</button>
+      <div class="h-sub" style="color:rgba(255,255,255,0.7);">Returns</div>
+    </div>
+    <div class="h-right">
+      <button class="btn-icon" title="Refresh" onclick="rtLoadList()">↻</button>
+      <div class="user-chip"><div class="user-av" id="av-rt"></div><div class="user-name" id="nm-rt"></div></div>
+    </div>
+  </div>
+  <div class="screen-body">
+    <div class="scan-zone" onclick="rtScanFromHub()">
+      <div class="scan-icon">📷</div>
+      <h3>Scan RMA Barcode</h3>
+      <p>Scan the barcode on the Return Authorization paperwork.</p>
+    </div>
+    <div class="card">
+      <div class="card-label">Or enter RTN number</div>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="rt-hub-rtn" placeholder="RTN00012345" maxlength="11" autocomplete="off" style="flex:1;text-transform:uppercase;"
+          oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')rtHubGo()"/>
+        <button class="btn btn-primary btn-sm" onclick="rtHubGo()">Go →</button>
+      </div>
+    </div>
+    <button class="btn btn-outline" onclick="rtNewLog({})" style="margin-top:0;">
+      📝 &nbsp;No RTN — Log With Customer Info
+    </button>
+
+    <div class="count-toggle" id="rt-pills"></div>
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="rt-search" placeholder="Search RTN, name, tracking…" autocomplete="off"
+        oninput="rtState.search=this.value.trim().toUpperCase();rtRenderList()"/>
+    </div>
+    <div id="rt-list"><div class="empty-state"><div class="empty-icon">⏳</div>Loading…</div></div>
+    <div class="bottom-safe"></div>
+  </div>
+</div>
+
+<!-- ══ RETURNS — LOG / EDIT ══ -->
+<div id="screen-rt-log" class="screen">
+  <div class="app-header">
+    <div class="h-left">
+      <button class="back-btn" onclick="rtLogBack()">← Back</button>
+      <div class="h-sub" id="rt-log-title" style="color:rgba(255,255,255,0.7);">Log Return</div>
+    </div>
+  </div>
+  <div class="screen-body">
+    <div class="card" id="rt-log-group" style="display:none;padding:10px 14px;border-left:3px solid var(--blue);">
+      <p style="font-size:13px;color:var(--text-dim);line-height:1.5;" id="rt-log-group-text"></p>
+    </div>
+
+    <div class="card">
+      <div class="card-label">RTN Number</div>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="rt-f-rtn" placeholder="RTN00012345" maxlength="11" autocomplete="off" style="flex:1;text-transform:uppercase;"
+          oninput="this.value=this.value.toUpperCase();rtState.logSource='Typed'"/>
+        <button class="btn btn-outline btn-sm" onclick="rtScanIntoForm()" title="Scan barcode">📷 Scan</button>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">Leave blank if there is no RTN — it can be added later.</div>
+    </div>
+
+    <div class="card" id="rt-log-attach" style="display:none;border-left:3px solid var(--amber);">
+      <div class="card-label">Already logged this box without an RTN?</div>
+      <p style="font-size:12px;color:var(--text-dim);line-height:1.5;margin-bottom:6px;">Tap it to add this RTN to it instead of logging a new return.</p>
+      <div id="rt-log-attach-list"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Shipped From</div>
+      <div class="field-group" style="margin-bottom:10px;">
+        <div class="field-label">Name / Company</div>
+        <input type="text" id="rt-f-name" maxlength="255" placeholder="From the shipping label"/>
+      </div>
+      <div class="field-group">
+        <div class="field-label">Address</div>
+        <textarea id="rt-f-address" rows="3" placeholder="Street, city, state"></textarea>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Shipment</div>
+      <div class="field-group" style="margin-bottom:10px;">
+        <div class="field-label">Carrier</div>
+        <input type="text" id="rt-f-carrier" list="rt-carriers" maxlength="255" placeholder="Pick or type"/>
+        <datalist id="rt-carriers">
+          <option value="FedEx"></option><option value="UPS"></option><option value="USPS"></option>
+          <option value="LTL Freight"></option><option value="Customer Drop-off"></option><option value="Other"></option>
+        </datalist>
+      </div>
+      <div class="field-group" style="margin-bottom:10px;">
+        <div class="field-label">Tracking #</div>
+        <input type="text" id="rt-f-tracking" maxlength="255" autocomplete="off"/>
+      </div>
+      <div class="field-group">
+        <div class="field-label">Boxes / Pallets</div>
+        <input type="text" id="rt-f-pkgs" inputmode="numeric" maxlength="4" placeholder="1" oninput="this.value=this.value.replace(/\D/g,'')"/>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Notes <span style="text-transform:none;font-weight:500;letter-spacing:0;">(optional)</span></div>
+      <textarea id="rt-f-notes" rows="3" placeholder="Damage to outside of box, anything unusual…"></textarea>
+    </div>
+
+    <button class="btn btn-primary" id="rt-log-save" onclick="rtSaveLog()">📥 &nbsp;Log Return — In Progress</button>
+    <p id="rt-log-help" style="font-size:11px;color:var(--text-muted);text-align:center;line-height:1.5;margin-top:-2px;">
+      With no RTN, enter at least a name or address. Photos can be taken now or later.
+    </p>
+    <div class="bottom-safe"></div>
+  </div>
+</div>
+
+<!-- ══ RETURNS — DETAIL / PHOTOS ══ -->
+<div id="screen-rt-detail" class="screen">
+  <div class="app-header">
+    <div class="h-left">
+      <button class="back-btn" onclick="rtDetailBack()">← Returns</button>
+      <div class="h-sub" id="rt-d-header">Return</div>
+    </div>
+    <div class="h-right">
+      <button class="btn-icon" title="Refresh" onclick="rtOpenReturn(rtState.cur?.id)">↻</button>
+    </div>
+  </div>
+  <div class="screen-body">
+    <div class="progress-summary">
+      <div class="progress-summary-left">
+        <div class="progress-order-num" id="rt-d-num">—</div>
+        <div class="progress-tagline" id="rt-d-tag">—</div>
+      </div>
+      <div id="rt-d-status"></div>
+    </div>
+
+    <div class="card" id="rt-d-link" style="display:none;border-left:3px solid var(--red);">
+      <div class="card-label">Add RTN Number</div>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="rt-d-link-rtn" placeholder="RTN00012345" maxlength="11" autocomplete="off" style="flex:1;text-transform:uppercase;"
+          oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')rtLinkFromInput()"/>
+        <button class="btn btn-outline btn-sm" onclick="rtLinkFromScan()">📷</button>
+        <button class="btn btn-primary btn-sm" onclick="rtLinkFromInput()">Save</button>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">Required before this return can be completed.</div>
+    </div>
+
+    <div class="card" id="rt-d-late" style="display:none;border-left:3px solid var(--amber);">
+      <div class="card-label">This return is complete</div>
+      <p style="font-size:12px;color:var(--text-dim);line-height:1.5;margin-bottom:8px;">To add more photos, first say why.</p>
+      <input type="text" id="rt-d-late-reason" maxlength="200" placeholder="Reason for adding photos…" oninput="rtState.lateReason=this.value.trim()"/>
+    </div>
+
+    <div class="card" id="rt-d-reqs"></div>
+    <div id="rt-d-sections"></div>
+
+    <div class="card">
+      <div class="card-label">Details</div>
+      <div id="rt-d-meta"></div>
+      <button class="btn btn-outline btn-sm" style="margin-top:10px;width:100%;" onclick="rtEditDetails()">✏️ &nbsp;Edit Details</button>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Same Box / Shipment</div>
+      <div id="rt-d-sibs"></div>
+      <button class="btn btn-outline btn-sm" style="margin-top:10px;width:100%;" onclick="rtAnotherInBox()">＋ &nbsp;Another RMA In This Box</button>
+    </div>
+
+    <button class="btn btn-success" id="rt-d-complete" onclick="rtComplete()">✅ &nbsp;Complete Return</button>
+    <button class="btn btn-outline" onclick="rtOpenFolder()">🔗 &nbsp;Open Folder in SharePoint</button>
+    <button class="btn btn-ghost" id="rt-d-cancel" onclick="rtCancelReturn()" style="font-size:12px;">Cancel This Return (logged by mistake)</button>
+    <div class="bottom-safe"></div>
+  </div>
+</div>
+
+<!-- ══ RETURNS — COMPLETE ══ -->
+<div id="screen-rt-done" class="screen">
+  <div class="app-header">
+    <div class="h-left"><div class="h-sub" style="color:rgba(255,255,255,0.6);">Return Saved</div></div>
+  </div>
+  <div class="screen-body" style="align-items:center;justify-content:center;text-align:center;">
+    <div style="font-size:64px;line-height:1;margin-bottom:10px;">✅</div>
+    <div style="font-family:var(--font-cond);font-size:24px;font-weight:900;letter-spacing:0.04em;text-transform:uppercase;color:var(--black);margin-bottom:8px;">Return Complete</div>
+    <div class="card" style="width:100%;max-width:380px;text-align:left;">
+      <div class="card-label">Summary</div>
+      <div class="sum-row"><span class="sum-lbl">App Return #</span><span class="sum-val mono" id="rt-done-app">—</span></div>
+      <div class="sum-row"><span class="sum-lbl">RTN</span><span class="sum-val mono" id="rt-done-rtn">—</span></div>
+      <div class="sum-row"><span class="sum-lbl">Photos</span><span class="sum-val" id="rt-done-photos">—</span></div>
+      <div class="sum-row"><span class="sum-lbl">Completed By</span><span class="sum-val" id="rt-done-user">—</span></div>
+    </div>
+    <div style="width:100%;max-width:380px;display:flex;flex-direction:column;gap:9px;margin-top:4px;">
+      <button class="btn btn-primary" onclick="rtAnotherInBox()">＋ &nbsp;Another RMA From This Same Box</button>
+      <button class="btn btn-outline" onclick="rtOpenHub()">↩️ &nbsp;Back to Returns</button>
     </div>
     <div class="bottom-safe"></div>
   </div>
@@ -906,6 +1129,55 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 
 </div><!-- /#app -->
 
+<!-- Returns: barcode scanner -->
+<div id="rt-scan" class="cam-fullscreen" style="display:none;">
+  <div class="cam-fs-header">
+    <div><div class="cam-fs-label">Scan RMA Barcode</div><div class="cam-fs-count">Align the barcode in the frame</div></div>
+    <button class="btn-icon" onclick="rtScanDone(null)" title="Close">✕</button>
+  </div>
+  <div class="cam-fs-video">
+    <video id="rt-scan-video" autoplay playsinline muted></video>
+    <div class="cam-overlay"><div class="cam-xhair-bar"></div></div>
+  </div>
+  <div class="cam-fs-footer">
+    <button class="btn btn-outline" style="width:auto;" onclick="rtScanDone(null)">Cancel</button>
+  </div>
+</div>
+
+<!-- Returns: photo camera -->
+<div id="rt-cam" class="cam-fullscreen" style="display:none;">
+  <div class="cam-fs-header">
+    <div><div class="cam-fs-label" id="rt-cam-label">Photo</div><div class="cam-fs-count" id="rt-cam-count"></div></div>
+    <button class="btn-icon" onclick="rtCloseCam()" title="Close camera">✕</button>
+  </div>
+  <div class="cam-fs-video">
+    <video id="rt-cam-video" autoplay playsinline muted></video>
+    <div class="cam-fs-flash" id="rt-cam-flash"></div>
+  </div>
+  <div class="cam-fs-footer">
+    <button class="cam-fs-shutter" onclick="rtCapture()" aria-label="Capture photo">📸</button>
+    <button class="btn btn-primary cam-fs-done" style="width:auto;padding:10px 18px;" onclick="rtCloseCam()">Done</button>
+  </div>
+</div>
+<input type="file" id="rt-upload-input" accept="image/*" multiple style="display:none" onchange="rtHandleFiles(event)">
+
+<!-- Returns: choice sheet -->
+<div id="rt-sheet-bg" onclick="if(event.target===this)rtCloseSheet()"><div id="rt-sheet"></div></div>
+
+<!-- Returns: photo viewer -->
+<div id="rt-viewer-bg">
+  <img id="rt-viewer-img" alt=""/>
+  <div class="rt-viewer-panel">
+    <div class="field-label" id="rt-viewer-title">Photo</div>
+    <input type="text" id="rt-viewer-caption" maxlength="255" placeholder="Caption — part number, damage, etc."/>
+    <div class="btn-row">
+      <button class="btn btn-outline btn-sm" onclick="rtCloseViewer()">Close</button>
+      <button class="btn btn-outline btn-sm" id="rt-viewer-del" style="color:var(--red);" onclick="rtDeletePhoto()">🗑 Delete</button>
+      <button class="btn btn-primary btn-sm" id="rt-viewer-save" onclick="rtSaveCaption()">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- Overlay & Toast -->
 <div id="overlay"><div class="spinner"></div><div class="overlay-txt" id="overlay-txt">Loading…</div></div>
 <div id="toast"></div>
@@ -1012,6 +1284,12 @@ const CFG = {
   listPartMaster:    'PartMaster',
   listLocations:     'PartMaster_Locations',
   listPartLocations: IS_TEST_ENV ? 'PartLocations_TEST' : 'PartLocations',
+  // ── Returns ─────────────────────────────────────────────
+  // Photos share the ShipmentPhotos library under a top-level folder:
+  //   /{returnsFolder}/{App_Return_ID}/{Section}/file.jpg
+  listReturns:      IS_TEST_ENV ? 'Returns_TEST'       : 'Returns',
+  listReturnPhotos: IS_TEST_ENV ? 'Return_Photos_TEST' : 'Return_Photos',
+  returnsFolder:    IS_TEST_ENV ? 'Returns_TEST'       : 'Returns',
   spSiteUrl:     'https://encoregrowth.sharepoint.com/sites/WarehouseShipping',
   isTest:        IS_TEST_ENV,
 };
@@ -1884,6 +2162,13 @@ function selectRainType(type){
 async function submitOrderEntry(){
   const val = document.getElementById('order-input').value.trim().toUpperCase();
   if(!val){ toast('Please enter or scan an order number','err'); return; }
+
+  // An RMA barcode scanned here goes to the Returns flow instead.
+  if(RT_RTN_RE.test(rtNormRtn(val))){
+    document.getElementById('order-input').value = '';
+    rtLookupRtn(rtNormRtn(val), 'Scanned');
+    return;
+  }
 
   const wf = detectWorkflow(val);
   S.orderNum = val;
@@ -4617,6 +4902,889 @@ function removePartLocation(i){
       hideOverlay();
     }
   });
+}
+
+// ═══════════════════════════════════════════════════
+//  RETURNS
+//  Returns(_TEST)       = one row per logged return (App Return # ↔ GP RTN #)
+//  Return_Photos(_TEST) = one row per photo
+//  Two steps: log at the dock (In Progress, no photos needed), then photos.
+//  Complete requires an RTN, an RMA Paperwork photo and an Items photo.
+//  Every return has a Receipt_Group_ID (its own App ID unless it came in
+//  the same box as another return). Label + box photos are shared by the group.
+//  Self-contained on purpose — does not depend on the Parts Lookup helpers.
+// ═══════════════════════════════════════════════════
+const RT_RTN_RE = /^RTN\d{8}$/;
+const RT_PREFER = 'HonorNonIndexedQueriesWarningMayFailRandomly';
+const RT_SECTIONS = [
+  {id:'Shipping Label',   folder:'ShippingLabel',  icon:'🏷️', shared:true,
+   help:'The carrier label on the outside of the box — captures who it came from.'},
+  {id:'RMA Paperwork',    folder:'RMAPaperwork',   icon:'📋', required:true,
+   help:'One photo per page of the Return Authorization. If none came with the box, print the RMA from GP and photograph it.'},
+  {id:'Box as Received',  folder:'BoxAsReceived',  icon:'📦', shared:true,
+   help:'The box or pallet right after opening, before anything is taken out. Shared with every RMA in this same box.'},
+  {id:'Items',            folder:'Items',          icon:'🔍', required:true,
+   help:'Each returned item on its own, on a cart or staging table, so its condition is clear. Take as many as needed.'},
+  {id:'Damage Close-ups', folder:'DamageCloseups', icon:'⚠️',
+   help:'Close-ups of any damage, missing parts or wear.'},
+];
+
+const rtState = {
+  filter:'open', search:'', list:[], counts:{}, loadSeq:0,
+  cur:null, sibs:[], photos:[], pending:[], thumbs:new Map(),
+  logSource:'Typed', logGroup:null, editing:false,
+  camSection:null, camStream:null, uploadSection:null, lateReason:'',
+  scanStream:null, scanTimer:null, scanReader:null, scanResolve:null,
+  viewer:null,
+};
+
+const rtHtml  = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const rtOdata = s => String(s).replace(/'/g,"''");
+const rtListUrl = list => `https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/lists/${list}/items`;
+const rtNormRtn = v => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g,'');
+const rtEl = id => document.getElementById(id);
+const rtAppId = itemId => 'AR-' + String(itemId).padStart(6,'0');
+const rtSection = id => RT_SECTIONS.find(s => s.id === id);
+
+async function rtToken(){ const t = await getToken(); await ensureSpIds(t); return t; }
+
+function rtUser(){
+  return { name: S.user?.name || S.user?.username || '', email: S.user?.username || S.user?.name || '' };
+}
+
+async function rtGetPages(token, url){
+  const out = [];
+  while(url){
+    const res = await fetch(url, { headers:{ Authorization:`Bearer ${token}`, Prefer:RT_PREFER } });
+    if(!res.ok){ const e = await res.json().catch(()=>({})); throw new Error(e.error?.message || `Request failed (${res.status})`); }
+    const d = await res.json();
+    out.push(...(d.value || []));
+    url = d['@odata.nextLink'] || null;
+  }
+  return out;
+}
+
+async function rtQuery(token, list, filter){
+  return rtGetPages(token, `${rtListUrl(list)}?$expand=fields&$top=500&$filter=${encodeURIComponent(filter)}`);
+}
+
+function rtMapReturn(it){
+  const f = it.fields || {};
+  return {
+    id: it.id, appId: f.App_Return_ID || f.Title || '', rtn: f.GP_RTN_Number || '',
+    group: f.Receipt_Group_ID || f.App_Return_ID || '', status: f.Status || 'In Progress',
+    source: f.Source || '', name: f.Ship_From_Name || '', address: f.Ship_From_Address || '',
+    carrier: f.Carrier || '', tracking: f.Tracking_Number || '', pkgs: f.Package_Count ?? '',
+    notes: f.Notes || '', loggedBy: f.Logged_By || '', loggedAt: f.Logged_DateTime || it.createdDateTime || '',
+    linkedBy: f.RTN_Linked_By || '', linkedAt: f.RTN_Linked_DateTime || '',
+    completedBy: f.Completed_By || '', completedAt: f.Completed_DateTime || '',
+    deleted: f.Is_Deleted === true,
+  };
+}
+
+function rtMapPhoto(it){
+  const f = it.fields || {};
+  return {
+    id: it.id, appId: f.App_Return_ID || '', section: f.Section || '', seq: f.Photo_Sequence || 0,
+    url: f.SharePoint_URL || '', caption: f.Caption || '', by: f.Captured_By || '',
+    at: f.Captured_DateTime || '', late: f.Added_After_Completion === true, deleted: f.Is_Deleted === true,
+  };
+}
+
+function rtDays(iso){
+  if(!iso) return 0;
+  return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86400000));
+}
+function rtFmtDate(iso){
+  if(!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ' ' + d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+}
+
+// ── Hub ─────────────────────────────────────────────
+function rtOpenHub(){
+  rtStopCam(); rtScanDone(null);
+  const u = rtUser();
+  rtEl('av-rt').textContent = u.name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+  rtEl('nm-rt').textContent = u.name;
+  rtEl('rt-hub-rtn').value = '';
+  rtState.cur = null;
+  showScreen('screen-returns');
+  rtLoadList();
+}
+
+function rtLeave(screenId){ rtStopCam(); rtScanDone(null); showScreen(screenId); }
+
+function rtSetFilter(f){ rtState.filter = f; rtLoadList(); }
+
+async function rtLoadList(){
+  const seq = ++rtState.loadSeq;
+  rtRenderPills();
+  rtEl('rt-list').innerHTML = '<div class="empty-state"><div class="empty-icon">⏳</div>Loading…</div>';
+  try{
+    const token = await rtToken();
+    let filter = "fields/Status eq 'In Progress'";
+    if(rtState.filter === 'done'){
+      const since = new Date(Date.now() - 30*86400000).toISOString();
+      filter = `fields/Status eq 'Complete' and fields/Completed_DateTime ge '${since}'`;
+    }
+    const items = await rtQuery(token, CFG.listReturns, filter);
+    if(seq !== rtState.loadSeq) return;
+    rtState.list = items.map(rtMapReturn).filter(r => !r.deleted)
+      .sort((a,b) => rtState.filter === 'done'
+        ? String(b.completedAt).localeCompare(String(a.completedAt))
+        : String(a.loggedAt).localeCompare(String(b.loggedAt)));
+    rtRenderList();
+    await rtLoadCounts(token, rtState.list.map(r => r.appId));
+    if(seq === rtState.loadSeq) rtRenderList();
+  }catch(e){
+    if(seq !== rtState.loadSeq) return;
+    console.error('rtLoadList failed:', e);
+    rtEl('rt-list').innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div>${rtHtml(e.message)}</div>`;
+  }
+}
+
+// Photo totals per return, fetched in chunks so the filter URL stays short.
+async function rtLoadCounts(token, appIds){
+  const counts = {};
+  const ids = appIds.filter(Boolean);
+  for(let i = 0; i < ids.length; i += 15){
+    const chunk = ids.slice(i, i + 15);
+    const flt = chunk.map(a => `fields/App_Return_ID eq '${rtOdata(a)}'`).join(' or ');
+    const rows = await rtQuery(token, CFG.listReturnPhotos, flt);
+    rows.map(rtMapPhoto).filter(p => !p.deleted).forEach(p => {
+      const c = counts[p.appId] || (counts[p.appId] = { total:0, paperwork:0, items:0 });
+      c.total++;
+      if(p.section === 'RMA Paperwork') c.paperwork++;
+      if(p.section === 'Items') c.items++;
+    });
+  }
+  rtState.counts = counts;
+}
+
+function rtRenderPills(){
+  const noRtn = rtState.filter !== 'done' ? rtState.list.filter(r => !r.rtn).length : null;
+  const pill = (key, label) =>
+    `<div class="count-pill ${rtState.filter===key?'active':''}" onclick="rtSetFilter('${key}')">${label}</div>`;
+  rtEl('rt-pills').innerHTML =
+    pill('open', 'Open') + pill('nortn', `No RTN${noRtn !== null ? ' ('+noRtn+')' : ''}`) + pill('done', 'Completed 30d');
+}
+
+function rtRenderList(){
+  rtRenderPills();
+  const q = rtState.search;
+  let rows = rtState.list;
+  if(rtState.filter === 'nortn') rows = rows.filter(r => !r.rtn);
+  if(q) rows = rows.filter(r => [r.appId, r.rtn, r.name, r.tracking, r.address, r.carrier]
+    .some(v => String(v).toUpperCase().includes(q)));
+  const box = rtEl('rt-list');
+  if(rows.length === 0){
+    box.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div>${
+      q ? 'No matches' : rtState.filter === 'done' ? 'No returns completed in the last 30 days' : 'No open returns'}</div>`;
+    return;
+  }
+  box.innerHTML = '<div class="order-list">' + rows.map(r => {
+    const c = rtState.counts[r.appId];
+    const days = rtDays(r.loggedAt);
+    const ageCls = days >= 7 ? 'late' : days >= 3 ? 'warn' : '';
+    const photoTxt = c ? `📷 ${c.total}${c.paperwork ? '' : ' · no RMA pic'}` : '📷 0';
+    return `
+    <div class="order-row" onclick="rtOpenReturn('${r.id}')">
+      <div class="order-row-left">
+        <div class="order-row-num">${r.rtn ? rtHtml(r.rtn) : '<span class="badge badge-red">No RTN</span>'}
+          <span style="font-size:11px;color:var(--text-muted);margin-left:6px;">${rtHtml(r.appId)}</span></div>
+        <div class="order-row-meta">${rtHtml(r.name || r.address.split('\n')[0] || '—')}${r.carrier ? ' · ' + rtHtml(r.carrier) : ''}</div>
+        <div class="order-row-meta">Logged ${rtFmtDate(r.loggedAt)}${r.loggedBy ? ' · ' + rtHtml(r.loggedBy) : ''}</div>
+      </div>
+      <div class="order-row-right">
+        ${r.status === 'Complete'
+          ? '<span class="badge badge-green">Complete</span>'
+          : `<span class="rt-age ${ageCls}">${days === 0 ? 'Today' : days + 'd open'}</span>`}
+        <span class="order-row-date">${photoTxt}</span>
+      </div>
+      <div class="order-row-chevron">›</div>
+    </div>`;
+  }).join('') + '</div>';
+}
+
+function rtHubGo(){
+  const v = rtNormRtn(rtEl('rt-hub-rtn').value);
+  if(!RT_RTN_RE.test(v)){ toast('RTN must be RTN + 8 digits (e.g. RTN00012345)', 'err'); return; }
+  rtLookupRtn(v, 'Typed');
+}
+
+async function rtScanFromHub(){
+  const raw = await rtScan();
+  if(raw === null) return;
+  const v = rtNormRtn(raw);
+  if(!RT_RTN_RE.test(v)){ toast(`Not an RTN barcode: ${raw}`, 'err'); return; }
+  rtLookupRtn(v, 'Scanned');
+}
+
+// Existing return for this RTN? Offer to open it; otherwise start a new log.
+async function rtLookupRtn(rtn, source){
+  showOverlay('Checking RTN…');
+  try{
+    const token = await rtToken();
+    const rows = (await rtQuery(token, CFG.listReturns, `fields/GP_RTN_Number eq '${rtOdata(rtn)}'`))
+      .map(rtMapReturn).filter(r => !r.deleted && r.status !== 'Cancelled');
+    hideOverlay();
+    if(rows.length === 0){ rtNewLog({ rtn, source }); return; }
+    rtOpenSheet(`
+      <h3>${rtHtml(rtn)} already logged</h3>
+      <p>Tap a return to open it, or log a new one if this is another shipment for the same RTN.</p>
+      ${rows.map(r => `
+        <div class="dup-shipment-row" onclick="rtCloseSheet();rtOpenReturn('${r.id}')">
+          <div><div class="dup-ship-id">${rtHtml(r.appId)}</div>
+            <div class="dup-ship-meta">${rtHtml(r.status)} · logged ${rtFmtDate(r.loggedAt)}</div></div>
+          <div class="dup-ship-photos">Open ›</div>
+        </div>`).join('')}
+      <button class="btn btn-outline" onclick="rtCloseSheet();rtNewLog({rtn:'${rtn}',source:'${source}'})">📥 &nbsp;Log New Shipment for This RTN</button>
+      <button class="btn btn-ghost" onclick="rtCloseSheet()">Cancel</button>`);
+  }catch(e){
+    hideOverlay();
+    toast('RTN check failed: ' + e.message, 'err');
+  }
+}
+
+function rtOpenSheet(html){ rtEl('rt-sheet').innerHTML = html; rtEl('rt-sheet-bg').classList.add('show'); }
+function rtCloseSheet(){ rtEl('rt-sheet-bg').classList.remove('show'); }
+
+// ── Log / edit form ─────────────────────────────────
+// opts: { rtn, source, group, groupFrom }
+function rtNewLog(opts){
+  rtState.editing = false;
+  rtState.logSource = opts.source || 'Typed';
+  rtState.logGroup = opts.group || null;
+  rtEl('rt-log-title').textContent = 'Log Return';
+  rtEl('rt-log-save').innerHTML = '📥 &nbsp;Log Return — In Progress';
+  rtEl('rt-log-help').style.display = '';
+  rtEl('rt-f-rtn').value = opts.rtn || '';
+  ['rt-f-name','rt-f-address','rt-f-carrier','rt-f-tracking','rt-f-pkgs','rt-f-notes'].forEach(id => rtEl(id).value = '');
+  const g = rtEl('rt-log-group');
+  if(opts.group){
+    // Same box: carry the shipping info over so it isn't typed twice.
+    const from = opts.groupFrom;
+    if(from){
+      rtEl('rt-f-name').value = from.name; rtEl('rt-f-address').value = from.address;
+      rtEl('rt-f-carrier').value = from.carrier; rtEl('rt-f-tracking').value = from.tracking;
+    }
+    rtEl('rt-log-group-text').textContent = `Same box as ${from ? from.appId : opts.group}. Box and label photos are shared — scan or type this RMA's RTN.`;
+    g.style.display = '';
+  } else {
+    g.style.display = 'none';
+  }
+  rtEl('rt-log-attach').style.display = 'none';
+  showScreen('screen-rt-log');
+  if(opts.rtn && !opts.group) rtShowAttachChoices(opts.rtn);
+}
+
+// A new RTN may belong to a box already logged without one — offer those.
+async function rtShowAttachChoices(rtn){
+  try{
+    const token = await rtToken();
+    const open = (await rtQuery(token, CFG.listReturns, "fields/Status eq 'In Progress'"))
+      .map(rtMapReturn).filter(r => !r.deleted && !r.rtn);
+    if(open.length === 0 || rtNormRtn(rtEl('rt-f-rtn').value) !== rtn) return;
+    rtEl('rt-log-attach-list').innerHTML = open.map(r => `
+      <div class="rt-sib-row" onclick="rtAttachRtn('${r.id}','${rtn}')">
+        <div><div class="mono" style="font-size:13px;font-weight:600;">${rtHtml(r.appId)}</div>
+          <div style="font-size:12px;color:var(--text-dim);">${rtHtml(r.name || r.address.split('\n')[0] || '—')} · ${rtFmtDate(r.loggedAt)}</div></div>
+        <span class="badge badge-amber">Add RTN</span>
+      </div>`).join('');
+    rtEl('rt-log-attach').style.display = '';
+  }catch(e){ console.warn('rtShowAttachChoices failed:', e); }
+}
+
+function rtAttachRtn(itemId, rtn){
+  showDialog('Add RTN to this return?', `${rtn} will be added to ${rtAppId(itemId)}, and no new return will be logged.`, 'Add RTN', async () => {
+    closeDialog();
+    showOverlay('Saving…');
+    try{
+      const token = await rtToken();
+      const it = await graphGet(token, `${rtListUrl(CFG.listReturns)}/${itemId}?$expand=fields`);
+      await rtApplyRtn(token, rtMapReturn(it), rtn);
+      hideOverlay();
+      toast(`${rtn} added`, 'ok');
+      rtOpenReturn(itemId);
+    }catch(e){ hideOverlay(); toast('Save failed: ' + e.message, 'err'); }
+  });
+}
+
+async function rtScanIntoForm(){
+  const raw = await rtScan();
+  if(raw === null) return;
+  const v = rtNormRtn(raw);
+  if(!RT_RTN_RE.test(v)){ toast(`Not an RTN barcode: ${raw}`, 'err'); return; }
+  rtEl('rt-f-rtn').value = v;
+  rtState.logSource = 'Scanned';
+  if(!rtState.editing && !rtState.logGroup) rtShowAttachChoices(v);
+}
+
+function rtLogBack(){
+  if(rtState.editing && rtState.cur){ showScreen('screen-rt-detail'); return; }
+  if(rtState.logGroup && rtState.cur){ rtOpenReturn(rtState.cur.id); return; }
+  rtOpenHub();
+}
+
+function rtEditDetails(){
+  const r = rtState.cur;
+  if(!r) return;
+  rtState.editing = true;
+  rtState.logGroup = null;
+  rtEl('rt-log-title').textContent = 'Edit ' + r.appId;
+  rtEl('rt-log-save').innerHTML = '💾 &nbsp;Save Changes';
+  rtEl('rt-log-help').style.display = 'none';
+  rtEl('rt-log-group').style.display = 'none';
+  rtEl('rt-log-attach').style.display = 'none';
+  rtEl('rt-f-rtn').value = r.rtn;
+  rtEl('rt-f-name').value = r.name;
+  rtEl('rt-f-address').value = r.address;
+  rtEl('rt-f-carrier').value = r.carrier;
+  rtEl('rt-f-tracking').value = r.tracking;
+  rtEl('rt-f-pkgs').value = r.pkgs === null ? '' : r.pkgs;
+  rtEl('rt-f-notes').value = r.notes;
+  showScreen('screen-rt-log');
+}
+
+async function rtSaveLog(){
+  const rtn = rtNormRtn(rtEl('rt-f-rtn').value);
+  const name = rtEl('rt-f-name').value.trim();
+  const address = rtEl('rt-f-address').value.trim();
+  if(rtn && !RT_RTN_RE.test(rtn)){ toast('RTN must be RTN + 8 digits (e.g. RTN00012345)', 'err'); return; }
+  if(!rtn && !name && !address){ toast('No RTN — enter at least a name or address', 'err'); return; }
+  const pkgs = parseInt(rtEl('rt-f-pkgs').value, 10);
+  const info = {
+    Ship_From_Name: name, Ship_From_Address: address,
+    Carrier: rtEl('rt-f-carrier').value.trim(), Tracking_Number: rtEl('rt-f-tracking').value.trim(),
+    Package_Count: Number.isFinite(pkgs) ? pkgs : null, Notes: rtEl('rt-f-notes').value.trim(),
+  };
+  showOverlay('Saving…');
+  try{
+    const token = await rtToken();
+    if(rtState.editing){
+      const r = rtState.cur;
+      const patch = { ...info };
+      if(patch.Package_Count === null) delete patch.Package_Count;
+      await spPatchListItem(token, CFG.listReturns, r.id, patch);
+      if(rtn !== r.rtn) await rtApplyRtn(token, r, rtn);
+      hideOverlay();
+      toast('Changes saved', 'ok');
+      rtOpenReturn(r.id);
+      return;
+    }
+    const u = rtUser();
+    const fields = {
+      ...info, Title: 'PENDING', Status: 'In Progress',
+      Source: rtn ? rtState.logSource : 'No RTN',
+      Logged_By: u.name, Logged_Email: u.email, Logged_DateTime: new Date().toISOString(), Is_Deleted: false,
+    };
+    if(rtn) fields.GP_RTN_Number = rtn;
+    if(info.Package_Count === null) delete fields.Package_Count;
+    // The App Return # comes from the SharePoint item ID, so it is only known
+    // after the row exists — create with a placeholder Title, then fill it in.
+    const created = await spCreateListItem(token, CFG.listReturns, fields);
+    const appId = rtAppId(created.id);
+    await spPatchListItem(token, CFG.listReturns, created.id,
+      { Title: appId, App_Return_ID: appId, Receipt_Group_ID: rtState.logGroup || appId });
+    hideOverlay();
+    toast(`Logged ${appId}${rtn ? ' — ' + rtn : ''}`, 'ok');
+    rtOpenReturn(created.id);
+  }catch(e){
+    hideOverlay();
+    console.error('rtSaveLog failed:', e);
+    toast('Save failed: ' + e.message, 'err');
+  }
+}
+
+// Sets (or changes) the RTN on a return and copies it onto its photos.
+async function rtApplyRtn(token, r, rtn){
+  const u = rtUser();
+  await spPatchListItem(token, CFG.listReturns, r.id, rtn
+    ? { GP_RTN_Number: rtn, RTN_Linked_By: u.name, RTN_Linked_DateTime: new Date().toISOString() }
+    : { GP_RTN_Number: '' });
+  const photos = await rtQuery(token, CFG.listReturnPhotos, `fields/App_Return_ID eq '${rtOdata(r.appId)}'`);
+  for(const p of photos) await spPatchListItem(token, CFG.listReturnPhotos, p.id, { GP_RTN_Number: rtn });
+}
+
+// ── Detail ──────────────────────────────────────────
+async function rtOpenReturn(itemId){
+  if(!itemId) return;
+  showOverlay('Loading return…');
+  try{
+    const token = await rtToken();
+    const it = await graphGet(token, `${rtListUrl(CFG.listReturns)}/${itemId}?$expand=fields`);
+    const r = rtMapReturn(it);
+    if(rtState.cur?.id !== r.id) rtState.lateReason = '';
+    rtState.cur = r;
+    rtState.pending = [];
+    const [sibItems, photoItems] = await Promise.all([
+      rtQuery(token, CFG.listReturns, `fields/Receipt_Group_ID eq '${rtOdata(r.group)}'`),
+      rtQuery(token, CFG.listReturnPhotos, `fields/Receipt_Group_ID eq '${rtOdata(r.group)}'`),
+    ]);
+    rtState.sibs = sibItems.map(rtMapReturn).filter(s => !s.deleted && s.id !== r.id && s.status !== 'Cancelled');
+    rtState.photos = photoItems.map(rtMapPhoto).filter(p => !p.deleted)
+      .sort((a,b) => String(a.at).localeCompare(String(b.at)));
+    hideOverlay();
+    rtEl('rt-d-late-reason').value = rtState.lateReason;
+    showScreen('screen-rt-detail');
+    rtRenderDetail();
+  }catch(e){
+    hideOverlay();
+    console.error('rtOpenReturn failed:', e);
+    toast('Could not open return: ' + e.message, 'err');
+  }
+}
+
+function rtOwnPhotos(section){
+  const appId = rtState.cur?.appId;
+  return rtState.photos.filter(p => p.appId === appId && (!section || p.section === section));
+}
+
+function rtReqs(){
+  const r = rtState.cur;
+  return [
+    { ok: !!r.rtn, label: 'RTN number' },
+    { ok: rtOwnPhotos('RMA Paperwork').length > 0, label: 'RMA paperwork photo' },
+    { ok: rtOwnPhotos('Items').length > 0, label: 'At least one item photo' },
+  ];
+}
+
+function rtRenderDetail(){
+  const r = rtState.cur;
+  if(!r) return;
+  const isOpen = r.status === 'In Progress';
+  rtEl('rt-d-header').textContent = r.appId;
+  rtEl('rt-d-num').textContent = r.rtn || 'NO RTN';
+  rtEl('rt-d-num').style.color = r.rtn ? '#fff' : 'var(--red)';
+  rtEl('rt-d-tag').textContent = `${r.appId} · logged ${rtFmtDate(r.loggedAt)}`;
+  const badge = { 'In Progress':'badge-amber', 'Complete':'badge-green', 'Cancelled':'badge-gray' }[r.status] || 'badge-gray';
+  rtEl('rt-d-status').innerHTML = `<span class="badge ${badge}">${rtHtml(r.status)}</span>`;
+
+  rtEl('rt-d-link').style.display = (!r.rtn && r.status !== 'Cancelled') ? '' : 'none';
+  rtEl('rt-d-late').style.display = r.status === 'Complete' ? '' : 'none';
+
+  const reqs = rtReqs();
+  rtEl('rt-d-reqs').style.display = isOpen ? '' : 'none';
+  rtEl('rt-d-reqs').innerHTML = '<div class="card-label">Needed to complete</div>' + reqs.map(q =>
+    `<div class="rt-req ${q.ok?'ok':''}"><div class="rt-req-dot">${q.ok?'✓':''}</div>${q.label}</div>`).join('');
+
+  const canAdd = r.status !== 'Cancelled';
+  rtEl('rt-d-sections').innerHTML = RT_SECTIONS.map(sec => {
+    const own = rtOwnPhotos(sec.id);
+    const shared = sec.shared ? rtState.photos.filter(p => p.appId !== r.appId && p.section === sec.id) : [];
+    const pend = rtState.pending.filter(p => p.section === sec.id);
+    const total = own.length + shared.length + pend.length;
+    const thumbs = [
+      ...own.map(p => rtThumbHtml(p, false)),
+      ...shared.map(p => rtThumbHtml(p, true)),
+      ...pend.map(p => `<div class="detail-thumb thumb-loaded"><img src="${p.preview}" style="opacity:.55"/>
+        <div class="detail-thumb-label">Saving…</div></div>`),
+    ].join('');
+    return `
+    <div class="stage-card ${total ? 'has-photos' : ''}" style="margin-bottom:12px;">
+      <div class="stage-card-header">
+        <div class="stage-card-title">${sec.icon} ${rtHtml(sec.id)}${sec.required ? ' <span style="color:var(--red);">*</span>' : ''}</div>
+        <div class="stage-card-count">${total} photo${total!==1?'s':''}</div>
+      </div>
+      <div class="stage-card-body">
+        <div class="stage-help">${rtHtml(sec.help)}</div>
+        ${thumbs ? `<div class="photo-grid">${thumbs}</div>` : ''}
+        ${canAdd ? `<div class="rt-sec-actions">
+          <button class="btn btn-primary" onclick="rtOpenCam('${sec.id}')">📸 Camera</button>
+          <button class="btn btn-outline" onclick="rtPickFiles('${sec.id}')">🖼 Upload</button>
+        </div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  const meta = [
+    ['App Return #', r.appId], ['RTN', r.rtn || '—'], ['Shipped From', r.name || '—'],
+    ['Address', r.address || '—'], ['Carrier', r.carrier || '—'], ['Tracking #', r.tracking || '—'],
+    ['Boxes / Pallets', r.pkgs === '' || r.pkgs === null ? '—' : r.pkgs], ['Notes', r.notes || '—'],
+    ['Logged', `${rtFmtDate(r.loggedAt)} · ${r.loggedBy || '—'}`],
+  ];
+  if(r.linkedAt) meta.push(['RTN Added', `${rtFmtDate(r.linkedAt)} · ${r.linkedBy || '—'}`]);
+  if(r.completedAt) meta.push(['Completed', `${rtFmtDate(r.completedAt)} · ${r.completedBy || '—'}`]);
+  rtEl('rt-d-meta').innerHTML = meta.map(([k,v]) =>
+    `<div class="detail-meta-row"><span class="detail-meta-lbl">${k}</span><span class="detail-meta-val" style="white-space:pre-line;">${rtHtml(v)}</span></div>`).join('');
+
+  rtEl('rt-d-sibs').innerHTML = rtState.sibs.length
+    ? rtState.sibs.map(s => `
+      <div class="rt-sib-row" onclick="rtOpenReturn('${s.id}')">
+        <div><span class="mono" style="font-size:13px;font-weight:600;">${rtHtml(s.rtn || 'No RTN')}</span>
+          <span style="font-size:11px;color:var(--text-muted);margin-left:6px;">${rtHtml(s.appId)}</span></div>
+        <span class="badge ${s.status==='Complete'?'badge-green':'badge-amber'}">${rtHtml(s.status)}</span>
+      </div>`).join('')
+    : '<div style="font-size:12px;color:var(--text-muted);">No other RMAs logged from this box.</div>';
+
+  const done = reqs.every(q => q.ok);
+  const btn = rtEl('rt-d-complete');
+  btn.style.display = isOpen ? '' : 'none';
+  btn.disabled = !done;
+  rtEl('rt-d-cancel').style.display = isOpen ? '' : 'none';
+
+  rtLoadThumbs();
+}
+
+function rtThumbHtml(p, shared){
+  const label = p.caption || (shared ? p.appId : `#${p.seq}`);
+  return `<div class="detail-thumb" onclick="rtView('${p.id}')">
+    <span class="thumb-spinner">⏳</span>
+    <img data-rt-url="${rtHtml(p.url)}" style="opacity:0" alt=""/>
+    ${shared ? '<span class="rt-shared-tag">Same box</span>' : ''}
+    ${p.late ? '<span class="late-tag">Late</span>' : ''}
+    <div class="detail-thumb-label">${rtHtml(label)}</div>
+  </div>`;
+}
+
+async function rtLoadThumbs(){
+  const imgs = Array.from(document.querySelectorAll('#rt-d-sections img[data-rt-url]'));
+  const todo = [];
+  for(const img of imgs){
+    const url = img.getAttribute('data-rt-url');
+    if(rtState.thumbs.has(url)) applyThumb(img, rtState.thumbs.get(url));
+    else todo.push(img);
+  }
+  if(!todo.length) return;
+  let token;
+  try{ token = await rtToken(); }catch{ return; }
+  let i = 0;
+  const worker = async () => {
+    while(i < todo.length){
+      const img = todo[i++];
+      const url = img.getAttribute('data-rt-url');
+      try{
+        const blobUrl = await fetchThumbnail(token, url);
+        rtState.thumbs.set(url, blobUrl);
+        applyThumb(img, blobUrl);
+      }catch(e){ markFailed(img); }
+    }
+  };
+  await Promise.all(Array.from({length: Math.min(4, todo.length)}, worker));
+}
+
+function rtDetailBack(){ rtStopCam(); rtOpenHub(); }
+
+function rtOpenFolder(){
+  const r = rtState.cur;
+  if(r) window.open(`${CFG.spSiteUrl}/${CFG.photoLibrary}/${CFG.returnsFolder}/${r.appId}`, '_blank');
+}
+
+// ── Link RTN from the detail screen ─────────────────
+async function rtLinkFromScan(){
+  const raw = await rtScan();
+  if(raw === null) return;
+  const v = rtNormRtn(raw);
+  if(!RT_RTN_RE.test(v)){ toast(`Not an RTN barcode: ${raw}`, 'err'); return; }
+  rtEl('rt-d-link-rtn').value = v;
+  rtLinkRtn(v);
+}
+
+function rtLinkFromInput(){
+  const v = rtNormRtn(rtEl('rt-d-link-rtn').value);
+  if(!RT_RTN_RE.test(v)){ toast('RTN must be RTN + 8 digits (e.g. RTN00012345)', 'err'); return; }
+  rtLinkRtn(v);
+}
+
+async function rtLinkRtn(rtn){
+  const r = rtState.cur;
+  showOverlay('Checking RTN…');
+  try{
+    const token = await rtToken();
+    const others = (await rtQuery(token, CFG.listReturns, `fields/GP_RTN_Number eq '${rtOdata(rtn)}'`))
+      .map(rtMapReturn).filter(o => !o.deleted && o.status !== 'Cancelled' && o.id !== r.id);
+    hideOverlay();
+    const save = async () => {
+      closeDialog();
+      showOverlay('Saving…');
+      try{
+        await rtApplyRtn(await rtToken(), r, rtn);
+        hideOverlay();
+        rtEl('rt-d-link-rtn').value = '';
+        toast(`${rtn} added`, 'ok');
+        rtOpenReturn(r.id);
+      }catch(e){ hideOverlay(); toast('Save failed: ' + e.message, 'err'); }
+    };
+    if(others.length){
+      showDialog('RTN already used', `${rtn} is already on ${others.map(o => o.appId).join(', ')}. Add it here too (e.g. a split shipment)?`, 'Add Anyway', save);
+    } else {
+      save();
+    }
+  }catch(e){
+    hideOverlay();
+    toast('RTN check failed: ' + e.message, 'err');
+  }
+}
+
+// ── Complete / cancel / same box ────────────────────
+async function rtComplete(){
+  const r = rtState.cur;
+  const missing = rtReqs().filter(q => !q.ok);
+  if(missing.length){ toast('Still needed: ' + missing.map(q => q.label).join(', '), 'err'); return; }
+  if(rtState.pending.length){ toast('Wait for photos to finish saving', 'err'); return; }
+  showOverlay('Completing…');
+  try{
+    const token = await rtToken();
+    const u = rtUser();
+    const now = new Date().toISOString();
+    await spPatchListItem(token, CFG.listReturns, r.id,
+      { Status:'Complete', Completed_By:u.name, Completed_Email:u.email, Completed_DateTime:now });
+    r.status = 'Complete'; r.completedBy = u.name; r.completedAt = now;
+    hideOverlay();
+    rtEl('rt-done-app').textContent = r.appId;
+    rtEl('rt-done-rtn').textContent = r.rtn;
+    rtEl('rt-done-photos').textContent = rtOwnPhotos().length;
+    rtEl('rt-done-user').textContent = u.name;
+    showScreen('screen-rt-done');
+  }catch(e){
+    hideOverlay();
+    toast('Complete failed: ' + e.message, 'err');
+  }
+}
+
+function rtCancelReturn(){
+  const r = rtState.cur;
+  showDialog('Cancel this return?', `${r.appId} will be marked Cancelled and drop off the open list. Its photos stay in SharePoint.`, 'Yes, Cancel It', async () => {
+    closeDialog();
+    showOverlay('Saving…');
+    try{
+      await spPatchListItem(await rtToken(), CFG.listReturns, r.id, { Status:'Cancelled' });
+      hideOverlay();
+      toast(`${r.appId} cancelled`, 'ok');
+      rtOpenHub();
+    }catch(e){ hideOverlay(); toast('Cancel failed: ' + e.message, 'err'); }
+  });
+}
+
+function rtAnotherInBox(){
+  const r = rtState.cur;
+  if(!r) return;
+  rtNewLog({ group: r.group, groupFrom: r, source: 'Typed' });
+}
+
+// ── Photos ──────────────────────────────────────────
+function rtCanAddPhotos(){
+  if(rtState.cur?.status === 'Complete' && !rtState.lateReason){
+    toast('Enter a reason for adding photos first', 'err');
+    rtEl('rt-d-late-reason').focus();
+    return false;
+  }
+  return true;
+}
+
+async function rtOpenCam(sectionId){
+  if(!rtCanAddPhotos()) return;
+  rtState.camSection = sectionId;
+  rtEl('rt-cam-label').textContent = rtSection(sectionId).icon + ' ' + sectionId;
+  rtUpdateCamCount();
+  rtEl('rt-cam').style.display = 'flex';
+  const video = rtEl('rt-cam-video');
+  if(rtState.camStream && rtState.camStream.active){ video.srcObject = rtState.camStream; return; }
+  try{
+    rtState.camStream = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode:'environment', width:{ideal:1920}, height:{ideal:1080} }
+    });
+    video.srcObject = rtState.camStream;
+  }catch(e){
+    toast('Camera unavailable — use Upload instead', 'err');
+    rtEl('rt-cam').style.display = 'none';
+  }
+}
+
+function rtUpdateCamCount(){
+  const sec = rtState.camSection;
+  const n = rtOwnPhotos(sec).length + rtState.pending.filter(p => p.section === sec).length;
+  rtEl('rt-cam-count').textContent = n ? `${n} photo${n!==1?'s':''} so far` : 'No photos yet';
+}
+
+function rtCapture(){
+  const video = rtEl('rt-cam-video');
+  if(!video.videoWidth) return;
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  canvas.toBlob(blob => { if(blob) rtUpload(rtState.camSection, blob); }, 'image/jpeg', 0.88);
+  const fl = rtEl('rt-cam-flash');
+  fl.classList.remove('flash'); void fl.offsetWidth; fl.classList.add('flash');
+}
+
+function rtStopCam(){
+  if(rtState.camStream){ rtState.camStream.getTracks().forEach(t => t.stop()); rtState.camStream = null; }
+  const w = rtEl('rt-cam');
+  if(w) w.style.display = 'none';
+}
+function rtCloseCam(){ rtStopCam(); }
+
+function rtPickFiles(sectionId){
+  if(!rtCanAddPhotos()) return;
+  rtState.uploadSection = sectionId;
+  const input = rtEl('rt-upload-input');
+  input.value = '';
+  input.click();
+}
+
+function rtHandleFiles(evt){
+  const files = Array.from(evt.target.files || []);
+  files.forEach(f => rtUpload(rtState.uploadSection, f));
+  if(files.length) toast(`${files.length} photo${files.length!==1?'s':''} added — saving…`, 'ok');
+}
+
+// Uploads one photo right away (same as shipping) so nothing is lost if the
+// app is closed. Shows a "Saving…" thumb until the list row exists.
+async function rtUpload(sectionId, blob){
+  const r = rtState.cur;
+  const sec = rtSection(sectionId);
+  if(!r || !sec) return;
+  const preview = URL.createObjectURL(blob);
+  const pend = { section: sectionId, preview };
+  rtState.pending.push(pend);
+  rtRenderDetail(); rtUpdateCamCount();
+  try{
+    const token = await rtToken();
+    const u = rtUser();
+    const seq = rtOwnPhotos(sectionId).length + rtState.pending.filter(p => p.section === sectionId).indexOf(pend) + 1;
+    const fileName = `${r.appId}_${sec.folder}_${seq}_${Date.now()}.jpg`;
+    const folder = `${CFG.returnsFolder}/${r.appId}/${sec.folder}`;
+    const spUrl = await spUploadFile(token, folder, fileName, blob);
+    const late = r.status === 'Complete';
+    const fields = {
+      Title: fileName, App_Return_ID: r.appId, GP_RTN_Number: r.rtn, Receipt_Group_ID: r.group,
+      Section: sectionId, Photo_Sequence: seq, SharePoint_URL: spUrl, File_Name: fileName,
+      Captured_By: u.name, Captured_Email: u.email, Captured_DateTime: new Date().toISOString(),
+      Added_After_Completion: late, Reason_Note: late ? rtState.lateReason : '', Is_Deleted: false,
+    };
+    const created = await spCreateListItem(token, CFG.listReturnPhotos, fields);
+    rtState.thumbs.set(spUrl, preview);
+    if(rtState.cur?.id === r.id) rtState.photos.push(rtMapPhoto(created));
+  }catch(e){
+    console.error('rtUpload failed:', e);
+    toast('Photo save failed: ' + e.message, 'err');
+  }finally{
+    rtState.pending = rtState.pending.filter(p => p !== pend);
+    if(rtState.cur?.id === r.id){ rtRenderDetail(); rtUpdateCamCount(); }
+  }
+}
+
+// ── Viewer: caption + delete ────────────────────────
+async function rtView(photoId){
+  const p = rtState.photos.find(x => x.id === photoId);
+  if(!p) return;
+  rtState.viewer = p;
+  const own = p.appId === rtState.cur?.appId;
+  rtEl('rt-viewer-title').textContent = `${p.section} · ${p.appId} · ${rtFmtDate(p.at)}${p.by ? ' · ' + p.by : ''}`;
+  rtEl('rt-viewer-caption').value = p.caption;
+  rtEl('rt-viewer-caption').disabled = !own;
+  rtEl('rt-viewer-del').style.display = own ? '' : 'none';
+  rtEl('rt-viewer-save').style.display = own ? '' : 'none';
+  const img = rtEl('rt-viewer-img');
+  img.src = rtState.thumbs.get(p.url) || '';
+  rtEl('rt-viewer-bg').classList.add('show');
+  // Swap the small thumbnail for the large rendition.
+  try{
+    const token = await rtToken();
+    const marker = '/' + CFG.photoLibrary + '/';
+    const at = p.url.indexOf(marker);
+    if(at < 0) return;
+    const enc = decodeURIComponent(p.url.substring(at + marker.length)).split('/').map(encodeURIComponent).join('/');
+    const res = await fetch(`https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/drives/${S.spDriveId}/root:/${enc}:/thumbnails/0/large/content`,
+      { headers:{ Authorization:`Bearer ${token}` } });
+    if(res.ok && rtState.viewer === p) img.src = URL.createObjectURL(await res.blob());
+  }catch(e){ console.warn('Large photo failed:', e); }
+}
+
+function rtCloseViewer(){ rtEl('rt-viewer-bg').classList.remove('show'); rtState.viewer = null; }
+
+async function rtSaveCaption(){
+  const p = rtState.viewer;
+  if(!p) return;
+  const caption = rtEl('rt-viewer-caption').value.trim();
+  showOverlay('Saving…');
+  try{
+    await spPatchListItem(await rtToken(), CFG.listReturnPhotos, p.id, { Caption: caption });
+    p.caption = caption;
+    hideOverlay();
+    rtCloseViewer();
+    rtRenderDetail();
+    toast('Caption saved', 'ok');
+  }catch(e){ hideOverlay(); toast('Save failed: ' + e.message, 'err'); }
+}
+
+// Same as shipping: soft-delete the list row, hard-delete the file.
+function rtDeletePhoto(){
+  const p = rtState.viewer;
+  if(!p) return;
+  showDialog('Delete this photo?', 'This permanently removes the photo from SharePoint.', 'Delete', async () => {
+    closeDialog();
+    showOverlay('Deleting photo…');
+    try{
+      const token = await rtToken();
+      await spPatchListItem(token, CFG.listReturnPhotos, p.id, { Is_Deleted: true });
+      try{
+        const marker = '/' + CFG.photoLibrary + '/';
+        const at = p.url.indexOf(marker);
+        if(at >= 0){
+          const enc = decodeURIComponent(p.url.substring(at + marker.length)).split('/').map(encodeURIComponent).join('/');
+          await fetch(`https://graph.microsoft.com/v1.0/sites/${S.spSiteId}/drives/${S.spDriveId}/root:/${enc}`,
+            { method:'DELETE', headers:{ Authorization:`Bearer ${token}` } });
+        }
+      }catch(e){ console.warn('File delete failed:', e.message); }
+      rtState.photos = rtState.photos.filter(x => x !== p);
+      hideOverlay();
+      rtCloseViewer();
+      rtRenderDetail();
+      toast('Photo deleted', 'ok');
+    }catch(e){ hideOverlay(); toast('Delete failed: ' + e.message, 'err'); }
+  });
+}
+
+// ── Barcode scanner (resolves with the raw text, or null if cancelled) ──
+function rtScan(){
+  return new Promise(async resolve => {
+    rtScanDone(null);
+    rtState.scanResolve = resolve;
+    rtEl('rt-scan').style.display = 'flex';
+    const video = rtEl('rt-scan-video');
+    try{
+      rtState.scanStream = await navigator.mediaDevices.getUserMedia({
+        video:{ facingMode:'environment', width:{ideal:1280}, height:{ideal:720} }
+      });
+      video.srcObject = rtState.scanStream;
+      await new Promise(ok => { if(video.readyState >= 2) ok(); else video.addEventListener('loadeddata', ok, {once:true}); });
+      if(rtState.scanResolve !== resolve) return;
+      if('BarcodeDetector' in window){
+        let fmts = [];
+        try{ fmts = await BarcodeDetector.getSupportedFormats(); }catch{ fmts = ['code_39','code_128','qr_code']; }
+        fmts = fmts.filter(f => ['code_39','code_128','code_93','qr_code','pdf417'].includes(f));
+        const det = new BarcodeDetector({ formats: fmts.length ? fmts : ['code_39'] });
+        rtState.scanTimer = setInterval(async () => {
+          if(video.readyState < 2) return;
+          try{ const codes = await det.detect(video); if(codes.length) rtScanDone(codes[0].rawValue); }catch{}
+        }, 150);
+      } else if(typeof ZXing !== 'undefined'){
+        rtState.scanReader = new ZXing.BrowserMultiFormatReader();
+        rtState.scanReader.decodeFromVideoDevice(null, video, (res) => { if(res) rtScanDone(res.getText()); });
+      } else {
+        toast('Scanner unavailable — type the RTN instead', 'err');
+        rtScanDone(null);
+      }
+    }catch(e){
+      console.error('rtScan error:', e);
+      toast(e.name === 'NotAllowedError' ? 'Camera blocked — allow camera access in Settings' : 'Camera unavailable — type the RTN instead', 'err');
+      rtScanDone(null);
+    }
+  });
+}
+
+function rtScanDone(val){
+  if(rtState.scanTimer){ clearInterval(rtState.scanTimer); rtState.scanTimer = null; }
+  if(rtState.scanReader){ try{ rtState.scanReader.reset(); }catch{} rtState.scanReader = null; }
+  if(rtState.scanStream){ rtState.scanStream.getTracks().forEach(t => t.stop()); rtState.scanStream = null; }
+  const w = rtEl('rt-scan');
+  if(w) w.style.display = 'none';
+  const resolve = rtState.scanResolve;
+  rtState.scanResolve = null;
+  if(resolve) resolve(val);
 }
 
 </script>
