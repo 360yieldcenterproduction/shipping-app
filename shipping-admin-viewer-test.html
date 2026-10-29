@@ -1399,6 +1399,12 @@ function rtSetQueue(q){
   RT.queue = q;
   RT.search = '';
   document.getElementById('rtSearch').value = '';
+  // Don't leave a return on screen that isn't in the bucket just clicked.
+  if(RT.selected && !rtInQueue(RT.selected, q)){
+    RT.selected = null;
+    RT.photos = null;
+    rtShowDetailPane();
+  }
   rtRenderList();
 }
 
@@ -1552,14 +1558,22 @@ function rtRenderDetail(){
   } else if(r.status === 'Cancelled'){
     acct.className = 'acct-card muted';
     acct.innerHTML = `<div><h3>Cancelled</h3><p>Shipping cancelled this return (logged by mistake). Nothing to post.</p></div><div></div>`;
+  } else if(r.status !== 'Complete'){
+    // Posting waits for shipping — photos may still be coming in.
+    acct.className = 'acct-card muted';
+    acct.innerHTML = `<div>
+        <h3>⏳ Shipping Still Working</h3>
+        <p>This return can't be posted yet. Once shipping finishes photos and completes it in the app, it moves to <strong>Ready to Post</strong>.${r.rtn ? '' : '\nIt also still needs an RTN number.'}</p>
+      </div>
+      <div class="acct-actions"><button class="btn btn-post" disabled title="Shipping must complete this return first">💲 Mark Posted</button></div>`;
   } else {
     const check = (cls, txt) => `<span class="acct-check ${cls}">${cls === 'ok' ? '✓' : cls === 'warn' ? '⚠' : '✗'} ${txt}</span>`;
     acct.className = 'acct-card';
     acct.innerHTML = `<div>
-        <h3>${r.status === 'Complete' ? 'Ready to Post' : 'Shipping Still Working'}</h3>
+        <h3>Ready to Post</h3>
         <div class="acct-checks">
           ${check(r.rtn ? 'ok' : 'no', r.rtn ? 'RTN ' + safeHtml(r.rtn) : 'No RTN yet')}
-          ${check(r.status === 'Complete' ? 'ok' : 'warn', r.status === 'Complete' ? 'Shipping complete' : 'Shipping not complete')}
+          ${check('ok', 'Shipping complete')}
           ${paperwork === null ? '' : check(paperwork ? 'ok' : 'warn', paperwork ? 'RMA paperwork photo' : 'No RMA paperwork photo')}
         </div>
         <textarea id="rtPostNote" rows="2" maxlength="500" placeholder="Optional: GP credit memo # or note"></textarea>
@@ -1625,7 +1639,7 @@ async function rtMarkPosted(){
   const r = RT.selected;
   if(!r || r.posted) return;
   if(!r.rtn){ toast('Shipping must add the RTN number first', 'err'); return; }
-  if(r.status !== 'Complete' && !confirm(`Shipping has not completed ${r.rtn} yet — photos may still be coming.\n\nMark it Posted anyway?`)) return;
+  if(r.status !== 'Complete'){ toast('Shipping must complete this return before it can be posted', 'err'); return; }
   const note = (document.getElementById('rtPostNote')?.value || '').trim();
   const token = await getToken();
   if(!token) return;

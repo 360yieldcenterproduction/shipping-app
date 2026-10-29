@@ -696,18 +696,21 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     </div>
 
     <div class="card">
-      <div class="card-label">Shipped From</div>
+      <div class="card-label" id="rt-log-from-label">Shipped From</div>
       <div class="field-group" style="margin-bottom:10px;">
         <div class="field-label">Name / Company</div>
         <input type="text" id="rt-f-name" maxlength="255" placeholder="From the shipping label"/>
       </div>
-      <div class="field-group">
+      <div style="display:none;font-size:11px;color:var(--text-muted);line-height:1.5;" id="rt-log-later">
+        That's all that's needed. Address, carrier and tracking can be added any time with Edit Details.
+      </div>
+      <div class="field-group" id="rt-f-address-wrap">
         <div class="field-label">Address</div>
         <textarea id="rt-f-address" rows="3" placeholder="Street, city, state"></textarea>
       </div>
     </div>
 
-    <div class="card">
+    <div class="card" id="rt-log-shipment">
       <div class="card-label">Shipment</div>
       <div class="field-group" style="margin-bottom:10px;">
         <div class="field-label">Carrier</div>
@@ -727,7 +730,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       </div>
     </div>
 
-    <div class="card">
+    <div class="card" id="rt-log-notes">
       <div class="card-label">Notes <span style="text-transform:none;font-weight:500;letter-spacing:0;">(optional)</span></div>
       <textarea id="rt-f-notes" rows="3" placeholder="Damage to outside of box, anything unusual…"></textarea>
     </div>
@@ -5184,8 +5187,20 @@ function rtNewLog(opts){
     g.style.display = 'none';
   }
   rtEl('rt-log-attach').style.display = 'none';
+  // With an RTN (or a same-box RMA) the paperwork in GP has the details —
+  // ask only for the sender. No-RTN logs still get the full form.
+  rtLogMode(!!(opts.rtn || opts.group));
   showScreen('screen-rt-log');
   if(opts.rtn && !opts.group) rtShowAttachChoices(opts.rtn);
+}
+
+function rtLogMode(quick){
+  ['rt-f-address-wrap','rt-log-shipment','rt-log-notes'].forEach(id => rtEl(id).style.display = quick ? 'none' : '');
+  rtEl('rt-log-later').style.display = quick ? '' : 'none';
+  rtEl('rt-log-from-label').innerHTML = quick
+    ? 'Sender <span style="text-transform:none;font-weight:500;letter-spacing:0;">(optional)</span>' : 'Shipped From';
+  rtEl('rt-log-help').textContent = quick
+    ? 'Photos are next.' : 'With no RTN, enter at least a name or address. Photos can be taken now or later.';
 }
 
 // A new RTN may belong to a box already logged without one — offer those.
@@ -5243,6 +5258,7 @@ function rtEditDetails(){
   rtState.logGroup = null;
   rtEl('rt-log-title').textContent = 'Edit ' + r.appId;
   rtEl('rt-log-save').innerHTML = '💾 &nbsp;Save Changes';
+  rtLogMode(false);
   rtEl('rt-log-help').style.display = 'none';
   rtEl('rt-log-group').style.display = 'none';
   rtEl('rt-log-attach').style.display = 'none';
@@ -5263,7 +5279,7 @@ async function rtSaveLog(){
   const name = rtEl('rt-f-name').value.trim();
   const address = rtEl('rt-f-address').value.trim();
   if(rtn && !RT_RTN_RE.test(rtn)){ toast('RTN must be RTN + 8 digits (e.g. RTN00012345)', 'err'); return; }
-  if(!rtn && !name && !address){ toast('No RTN — enter at least a name or address', 'err'); return; }
+  if(!rtn && !name && !address){ rtLogMode(false); toast('No RTN — enter at least a name or address', 'err'); return; }
   const pkgs = parseInt(rtEl('rt-f-pkgs').value, 10);
   const info = {
     Ship_From_Name: name, Ship_From_Address: address,
