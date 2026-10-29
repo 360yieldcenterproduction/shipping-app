@@ -777,6 +777,11 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <input type="text" id="rt-d-late-reason" maxlength="200" placeholder="Reason for adding photos…" oninput="rtState.lateReason=this.value.trim()"/>
     </div>
 
+    <div class="card" id="rt-d-posted" style="display:none;border-left:3px solid var(--blue);">
+      <div class="card-label">💲 Credit Posted</div>
+      <div id="rt-d-posted-text" style="font-size:13px;color:var(--text-dim);line-height:1.5;white-space:pre-line;"></div>
+    </div>
+
     <div class="card" id="rt-d-reqs"></div>
     <div id="rt-d-sections"></div>
 
@@ -4978,6 +4983,9 @@ function rtMapReturn(it){
     notes: f.Notes || '', loggedBy: f.Logged_By || '', loggedAt: f.Logged_DateTime || it.createdDateTime || '',
     linkedBy: f.RTN_Linked_By || '', linkedAt: f.RTN_Linked_DateTime || '',
     completedBy: f.Completed_By || '', completedAt: f.Completed_DateTime || '',
+    // Set by accounting from the admin dashboard once the credit is posted in GP.
+    posted: f.Posted === true, postedBy: f.Posted_By || '', postedAt: f.Posted_DateTime || '',
+    postedNote: f.Posted_Note || '',
     deleted: f.Is_Deleted === true,
   };
 }
@@ -5098,8 +5106,8 @@ function rtRenderList(){
       </div>
       <div class="order-row-right">
         ${r.status === 'Complete'
-          ? '<span class="badge badge-green">Complete</span>'
-          : `<span class="rt-age ${ageCls}">${days === 0 ? 'Today' : days + 'd open'}</span>`}
+          ? (r.posted ? '<span class="badge badge-blue">Posted</span>' : '<span class="badge badge-green">Complete</span>')
+          : `<span class="rt-age ${ageCls}">${days === 0 ? 'Today' : days + 'd open'}</span>${r.posted ? ' <span class="badge badge-blue">Posted</span>' : ''}`}
         <span class="order-row-date">${photoTxt}</span>
       </div>
       <div class="order-row-chevron">›</div>
@@ -5160,6 +5168,7 @@ function rtNewLog(opts){
   rtEl('rt-log-save').innerHTML = '📥 &nbsp;Log Return — In Progress';
   rtEl('rt-log-help').style.display = '';
   rtEl('rt-f-rtn').value = opts.rtn || '';
+  rtEl('rt-f-rtn').disabled = false;
   ['rt-f-name','rt-f-address','rt-f-carrier','rt-f-tracking','rt-f-pkgs','rt-f-notes'].forEach(id => rtEl(id).value = '');
   const g = rtEl('rt-log-group');
   if(opts.group){
@@ -5238,6 +5247,8 @@ function rtEditDetails(){
   rtEl('rt-log-group').style.display = 'none';
   rtEl('rt-log-attach').style.display = 'none';
   rtEl('rt-f-rtn').value = r.rtn;
+  // The credit is already in GP under this RTN — accounting must undo Posted to change it.
+  rtEl('rt-f-rtn').disabled = r.posted;
   rtEl('rt-f-name').value = r.name;
   rtEl('rt-f-address').value = r.address;
   rtEl('rt-f-carrier').value = r.carrier;
@@ -5359,7 +5370,11 @@ function rtRenderDetail(){
   rtEl('rt-d-num').style.color = r.rtn ? '#fff' : 'var(--red)';
   rtEl('rt-d-tag').textContent = `${r.appId} · logged ${rtFmtDate(r.loggedAt)}`;
   const badge = { 'In Progress':'badge-amber', 'Complete':'badge-green', 'Cancelled':'badge-gray' }[r.status] || 'badge-gray';
-  rtEl('rt-d-status').innerHTML = `<span class="badge ${badge}">${rtHtml(r.status)}</span>`;
+  rtEl('rt-d-status').innerHTML = `<span class="badge ${badge}">${rtHtml(r.status)}</span>` +
+    (r.posted ? ' <span class="badge badge-blue">Posted</span>' : '');
+  rtEl('rt-d-posted').style.display = r.posted ? '' : 'none';
+  rtEl('rt-d-posted-text').textContent =
+    `Accounting posted the credit in GP — ${r.postedBy || '—'}, ${rtFmtDate(r.postedAt)}.` + (r.postedNote ? `\n${r.postedNote}` : '');
 
   rtEl('rt-d-link').style.display = (!r.rtn && r.status !== 'Cancelled') ? '' : 'none';
   rtEl('rt-d-late').style.display = r.status === 'Complete' ? '' : 'none';
@@ -5406,6 +5421,7 @@ function rtRenderDetail(){
   ];
   if(r.linkedAt) meta.push(['RTN Added', `${rtFmtDate(r.linkedAt)} · ${r.linkedBy || '—'}`]);
   if(r.completedAt) meta.push(['Completed', `${rtFmtDate(r.completedAt)} · ${r.completedBy || '—'}`]);
+  meta.push(['Credit Posted', r.posted ? `${rtFmtDate(r.postedAt)} · ${r.postedBy || '—'}` : 'Not yet — accounting']);
   rtEl('rt-d-meta').innerHTML = meta.map(([k,v]) =>
     `<div class="detail-meta-row"><span class="detail-meta-lbl">${k}</span><span class="detail-meta-val" style="white-space:pre-line;">${rtHtml(v)}</span></div>`).join('');
 
@@ -5414,7 +5430,7 @@ function rtRenderDetail(){
       <div class="rt-sib-row" onclick="rtOpenReturn('${s.id}')">
         <div><span class="mono" style="font-size:13px;font-weight:600;">${rtHtml(s.rtn || 'No RTN')}</span>
           <span style="font-size:11px;color:var(--text-muted);margin-left:6px;">${rtHtml(s.appId)}</span></div>
-        <span class="badge ${s.status==='Complete'?'badge-green':'badge-amber'}">${rtHtml(s.status)}</span>
+        <span class="badge ${s.posted?'badge-blue':s.status==='Complete'?'badge-green':'badge-amber'}">${s.posted ? 'Posted' : rtHtml(s.status)}</span>
       </div>`).join('')
     : '<div style="font-size:12px;color:var(--text-muted);">No other RMAs logged from this box.</div>';
 
@@ -5422,7 +5438,7 @@ function rtRenderDetail(){
   const btn = rtEl('rt-d-complete');
   btn.style.display = isOpen ? '' : 'none';
   btn.disabled = !done;
-  rtEl('rt-d-cancel').style.display = isOpen ? '' : 'none';
+  rtEl('rt-d-cancel').style.display = isOpen && !r.posted ? '' : 'none';
 
   rtLoadThumbs();
 }
